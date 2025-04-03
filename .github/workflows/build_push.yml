@@ -49,6 +49,7 @@ jobs:
           ALIAS: ${{ secrets.ALIAS }}
           KEY_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          MANGAPLUS_SALT: ${{ secrets.MANGAPLUS_SALT }}
         run: |
           cd main
           ./gradlew -p src assembleRelease
