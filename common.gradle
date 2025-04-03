@@ -14,7 +14,7 @@ if (theme != null) evaluationDependsOn(theme.path)
 android {
     compileSdk AndroidConfig.compileSdk
 
-    namespace "eu.kanade.tachiyomi.extension"
+    namespace "io.github.awkwardpeak.extension"
     sourceSets {
         main {
             manifest.srcFile "AndroidManifest.xml"
@@ -40,7 +40,7 @@ android {
                 nsfw    : project.ext.find("isNsfw") ? 1 : 0,
         ]
         String baseUrl = project.ext.find("baseUrl") ?: ""
-        if (theme != null && !baseUrl.isEmpty()) {
+        if (!baseUrl.isEmpty()) {
             def split = baseUrl.split("://")
             assert split.length == 2
             def path = split[1].split("/")

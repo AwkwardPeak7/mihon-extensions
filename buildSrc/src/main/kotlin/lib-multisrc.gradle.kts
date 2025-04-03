@@ -12,7 +12,7 @@ android {
         minSdk = AndroidConfig.minSdk
     }
 
-    namespace = "eu.kanade.tachiyomi.multisrc.${project.name}"
+    namespace = "io.github.awkwardpeak.multisrc.${project.name}"
 
     sourceSets {
         named("main") {

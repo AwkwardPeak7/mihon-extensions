@@ -9,7 +9,7 @@ android {
         minSdk = AndroidConfig.minSdk
     }
 
-    namespace = "eu.kanade.tachiyomi.extension.core"
+    namespace = "io.github.awkwardpeak.core"
 
     sourceSets {
         named("main") {
