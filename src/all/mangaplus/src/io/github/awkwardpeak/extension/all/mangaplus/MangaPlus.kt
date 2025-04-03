@@ -1,6 +1,5 @@
 package io.github.awkwardpeak.extension.all.mangaplus
 
-import android.app.Application
 import android.os.Build
 import android.text.InputType
 import androidx.preference.EditTextPreference
@@ -17,12 +16,14 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
+import io.github.awkwardpeak.extension.all.mangaplus.mangadex.MangaDexMetadataFetcher
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPErrorAction
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPLanguage
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPResponse
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPSuccessResult
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPTitle
 import io.github.awkwardpeak.lib.i18n.Intl
+import keiyoushi.utils.getPreferencesLazy
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 import okhttp3.CacheControl
@@ -34,8 +35,6 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import rx.Observable
-import uy.kohesive.injekt.Injekt
-import uy.kohesive.injekt.api.get
 import java.io.IOException
 import java.security.MessageDigest
 import java.text.DecimalFormat
@@ -57,7 +56,6 @@ class MangaPlus(private val mpLang: MPLanguage) : HttpSource(), ConfigurableSour
 
     override val client = network.client.newBuilder()
         .addInterceptor(::authIntercept)
-        .addInterceptor(::thumbnailIntercept)
         .rateLimitHost(API_URL, 1)
         .build()
 
@@ -66,9 +64,7 @@ class MangaPlus(private val mpLang: MPLanguage) : HttpSource(), ConfigurableSour
 
     private val internalLang = mpLang.internalLang
 
-    private val preferences by lazy {
-        Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
-    }
+    private val preferences by getPreferencesLazy()
 
     private val intl = Intl(
         lang,
@@ -118,10 +114,22 @@ class MangaPlus(private val mpLang: MPLanguage) : HttpSource(), ConfigurableSour
 
     private fun parseDirectory(page: Int): MangasPage {
         val directory = titleCache!!.values
-        val manga = directory.drop((page - 1) * 24).take(24).map { it.toSManga() }
+        val manga = directory.drop((page - 1) * 24).take(24)
+
+        val covers = MangaDexMetadataFetcher.getCovers(
+            manga.map { it.titleId.toString() },
+            small = true,
+        )
+
+        val entries = manga.map {
+            it.toSManga().apply {
+                thumbnail_url = covers[it.titleId.toString()] ?: thumbnail_url
+            }
+        }
+
         val hasNextPage = (page + 1) * 24 < titleCache!!.size
 
-        return MangasPage(manga, hasNextPage)
+        return MangasPage(entries, hasNextPage)
     }
 
     override fun fetchLatestUpdates(page: Int): Observable<MangasPage> {
@@ -233,6 +241,7 @@ class MangaPlus(private val mpLang: MPLanguage) : HttpSource(), ConfigurableSour
     }
 
     override fun mangaDetailsParse(response: Response): SManga {
+        val titleId = response.request.url.queryParameter("title_id")!!
         val titleDetailView = response.parseAsMpResponse().titleDetailView!!
 
         if (titleDetailView.title.language != mpLang) {
@@ -241,7 +250,9 @@ class MangaPlus(private val mpLang: MPLanguage) : HttpSource(), ConfigurableSour
 
         subscriptionReading = titleDetailView.userSubscription.planType != "basic"
 
-        return titleDetailView.toSManga(intl)
+        return titleDetailView.toSManga(intl).apply {
+            thumbnail_url = MangaDexMetadataFetcher.getCover(titleId) ?: thumbnail_url
+        }
     }
 
     override fun chapterListRequest(manga: SManga) = mangaDetailsRequest(manga)
@@ -457,29 +468,6 @@ class MangaPlus(private val mpLang: MPLanguage) : HttpSource(), ConfigurableSour
         return chain.proceed(newRequest)
     }
 
-    private fun thumbnailIntercept(chain: Interceptor.Chain): Response {
-        val request = chain.request()
-        val response = chain.proceed(request)
-
-        // Check if it is 404 to maintain compatibility when the extension used Weserv.
-        val isBadCode = (response.code == 401 || response.code == 404)
-
-        if (!isBadCode && !request.url.toString().contains(TITLE_THUMBNAIL_PATH)) {
-            return response
-        }
-
-        val titleId = request.url.toString()
-            .substringBefore("/$TITLE_THUMBNAIL_PATH")
-            .substringAfterLast("/")
-            .toInt()
-        val title = titleCache?.get(titleId) ?: return response
-
-        response.close()
-
-        val thumbnailRequest = GET(title.portraitImageUrl, request.headers)
-        return chain.proceed(thumbnailRequest)
-    }
-
     @Suppress("ThrowsCount")
     private fun Response.parseAsMpResponse(): MPSuccessResult {
         val data = ProtoBuf.decodeFromByteArray<MPResponse>(body.bytes())
@@ -536,7 +524,6 @@ private const val PREF_SPLIT_DOUBLE_PAGES = "splitImage"
 private const val PREF_HIDE_PAID_CHAPTERS = "hidePaidChapters"
 
 private const val APP_VER = "199"
-private const val TITLE_THUMBNAIL_PATH = "title_thumbnail_portrait_list"
 
 private fun ByteArray.toHex(): String = joinToString(separator = "") { eachByte -> "%02x".format(eachByte) }
 
