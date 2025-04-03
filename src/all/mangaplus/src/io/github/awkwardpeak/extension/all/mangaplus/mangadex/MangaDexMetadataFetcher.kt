@@ -2,6 +2,7 @@ package io.github.awkwardpeak.extension.all.mangaplus.mangadex
 
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.NetworkHelper
+import eu.kanade.tachiyomi.network.interceptor.rateLimit
 import keiyoushi.utils.parseAs
 import okhttp3.CacheControl
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -13,6 +14,9 @@ object MangaDexMetadataFetcher {
     private val apiUrl = "https://api.mangadex.org"
 
     private val client = Injekt.get<NetworkHelper>().cloudflareClient
+        .newBuilder()
+        .rateLimit(3)
+        .build()
 
     private val mapping: Map<String, String> by lazy {
         client.newCall(
@@ -24,22 +28,33 @@ object MangaDexMetadataFetcher {
     }
 
     fun getCovers(ids: List<String>, small: Boolean = false): Map<String, String?> {
-        val url = apiUrl.toHttpUrl().newBuilder().apply {
-            addPathSegment("cover")
-            addQueryParameter("order[volume]", "desc")
-            addQueryParameter("locales[]", "ja")
-            addQueryParameter("limit", "100")
-            ids.forEach { mpID ->
-                mapping[mpID]?.also { uuid ->
-                    addQueryParameter("manga[]", uuid)
+        var offset = 0
+        var total: Int
+        val data = mutableListOf<CoverArt>()
+
+        do {
+            val url = apiUrl.toHttpUrl().newBuilder().apply {
+                addPathSegment("cover")
+                addQueryParameter("order[volume]", "desc")
+                addQueryParameter("locales[]", "ja")
+                addQueryParameter("limit", "100")
+                ids.forEach { mpID ->
+                    mapping[mpID]?.also { uuid ->
+                        addQueryParameter("manga[]", uuid)
+                    }
                 }
-            }
-        }.build()
+                addQueryParameter("offset", offset.toString())
+            }.build()
 
-        val data = client.newCall(GET(url, commonEmptyHeaders)).execute()
-            .parseAs<CoverArtResponse>()
+            val response = client.newCall(GET(url, commonEmptyHeaders)).execute()
+                .parseAs<CoverArtResponse>()
 
-        val coverMap = data.data.groupBy { coverArt ->
+            data += response.data
+            offset += response.limit
+            total = response.total
+        } while (offset < total)
+
+        val coverMap = data.groupBy { coverArt ->
             coverArt.relationships.firstOrNull { it.type == "manga" }!!.id
         }.mapValues { (_, values) ->
             values.maxByOrNull { coverArt ->
