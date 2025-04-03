@@ -1,8 +1,8 @@
 package io.github.awkwardpeak.extension.all.mangaplus.models
 
-import io.github.awkwardpeak.lib.i18n.Intl
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
+import io.github.awkwardpeak.lib.i18n.Intl
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoNumber
 

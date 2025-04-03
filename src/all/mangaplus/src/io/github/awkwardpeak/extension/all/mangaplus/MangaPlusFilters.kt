@@ -1,6 +1,5 @@
 package io.github.awkwardpeak.extension.all.mangaplus
 
-import io.github.awkwardpeak.lib.i18n.Intl
 import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPAllTitlesGroup
@@ -8,6 +7,7 @@ import io.github.awkwardpeak.extension.all.mangaplus.models.MPLabel
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPLabelCode
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPLanguage
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPTitle
+import io.github.awkwardpeak.lib.i18n.Intl
 
 object MangaPlusFilters {
     fun getFilterList(intl: Intl): FilterList = FilterList(
@@ -96,7 +96,8 @@ object MangaPlusFilters {
 
     private class Tag(name: String, val slug: String) : Filter.TriState(name)
 
-    private class TagList(name: String, tags: List<Tag>) : Filter.Group<Tag>(name, tags),
+    private class TagList(name: String, tags: List<Tag>) :
+        Filter.Group<Tag>(name, tags),
         Filterable {
         override fun retainMatchingTitles(titles: MutableList<MPAllTitlesGroup>) {
             val included = mutableListOf<String>()
@@ -128,7 +129,7 @@ object MangaPlusFilters {
 
     private class LabelList(
         name: String,
-        labels: List<Label>
+        labels: List<Label>,
     ) : Filter.Group<Label>(name, labels), Filterable {
         override fun retainMatchingTitles(titles: MutableList<MPAllTitlesGroup>) {
             val included = state.filter { it.state }.map { it.label }

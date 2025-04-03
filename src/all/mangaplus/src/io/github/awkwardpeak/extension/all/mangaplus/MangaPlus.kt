@@ -7,7 +7,6 @@ import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
 import androidx.preference.SwitchPreferenceCompat
-import io.github.awkwardpeak.lib.i18n.Intl
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.asObservableSuccess
 import eu.kanade.tachiyomi.network.interceptor.rateLimitHost
@@ -23,6 +22,7 @@ import io.github.awkwardpeak.extension.all.mangaplus.models.MPLanguage
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPResponse
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPSuccessResult
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPTitle
+import io.github.awkwardpeak.lib.i18n.Intl
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 import okhttp3.CacheControl
@@ -212,7 +212,7 @@ class MangaPlus(private val mpLang: MPLanguage) : HttpSource(), ConfigurableSour
             data.searchView!!.allTitlesGroup,
             mpLang,
             query,
-            filters
+            filters,
         )
             .associateBy { it.titleId }
 
@@ -535,7 +535,7 @@ private const val PREF_IMAGE_QUALITY = "imageResolution"
 private const val PREF_SPLIT_DOUBLE_PAGES = "splitImage"
 private const val PREF_HIDE_PAID_CHAPTERS = "hidePaidChapters"
 
-private const val APP_VER = "182"
+private const val APP_VER = "199"
 private const val TITLE_THUMBNAIL_PATH = "title_thumbnail_portrait_list"
 
 private fun ByteArray.toHex(): String = joinToString(separator = "") { eachByte -> "%02x".format(eachByte) }
