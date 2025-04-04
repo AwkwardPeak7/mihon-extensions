@@ -30,7 +30,7 @@ object MangaDexMetadataFetcher {
     fun getCovers(ids: List<String>, small: Boolean = false): Map<String, String?> {
         var offset = 0
         var total: Int
-        val data = mutableListOf<CoverArt>()
+        val data = mutableListOf<Manga>()
 
         val mdexUuids = ids.mapNotNull { id ->
             mapping[id]
@@ -42,30 +42,26 @@ object MangaDexMetadataFetcher {
 
         do {
             val url = apiUrl.toHttpUrl().newBuilder().apply {
-                addPathSegment("cover")
-                addQueryParameter("order[volume]", "desc")
-                addQueryParameter("locales[]", "ja")
+                addPathSegment("manga")
                 addQueryParameter("limit", "100")
-                mdexUuids.forEach { uuid ->
-                    addQueryParameter("manga[]", uuid)
-                }
                 addQueryParameter("offset", offset.toString())
+                addQueryParameter("includes[]", "cover_art")
+                mdexUuids.forEach { uuid ->
+                    addQueryParameter("ids[]", uuid)
+                }
             }.build()
 
             val response = client.newCall(GET(url, commonEmptyHeaders)).execute()
-                .parseAs<CoverArtResponse>()
+                .parseAs<MangasResponse>()
 
             data += response.data
             offset += response.limit
             total = response.total
         } while (offset < total)
 
-        val coverMap = data.groupBy { coverArt ->
-            coverArt.relationships.firstOrNull { it.type == "manga" }!!.id
-        }.mapValues { (_, values) ->
-            values.maxByOrNull { coverArt ->
-                coverArt.attributes.volume?.toFloatOrNull() ?: Float.MIN_VALUE
-            }?.attributes?.fileName?.takeIf { it.isNotEmpty() }
+        val coverMap = data.associate { manga ->
+            manga.id to
+                manga.relationships.firstOrNull()?.attributes?.fileName?.takeIf { it.isNotEmpty() }
         }
 
         return ids.associateWith { mpId ->
