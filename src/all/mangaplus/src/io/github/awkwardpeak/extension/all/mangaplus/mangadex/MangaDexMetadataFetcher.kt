@@ -32,16 +32,22 @@ object MangaDexMetadataFetcher {
         var total: Int
         val data = mutableListOf<CoverArt>()
 
+        val mdexUuids = ids.mapNotNull { id ->
+            mapping[id]
+        }
+
+        if (mdexUuids.isEmpty()) {
+            return ids.associateWith { null }
+        }
+
         do {
             val url = apiUrl.toHttpUrl().newBuilder().apply {
                 addPathSegment("cover")
                 addQueryParameter("order[volume]", "desc")
                 addQueryParameter("locales[]", "ja")
                 addQueryParameter("limit", "100")
-                ids.forEach { mpID ->
-                    mapping[mpID]?.also { uuid ->
-                        addQueryParameter("manga[]", uuid)
-                    }
+                mdexUuids.forEach { uuid ->
+                    addQueryParameter("manga[]", uuid)
                 }
                 addQueryParameter("offset", offset.toString())
             }.build()
