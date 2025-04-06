@@ -73,8 +73,10 @@ class HeanCmsChapterDto(
     @SerialName("created_at") val createdAt: String? = null,
     val price: Int? = null,
 ) {
-    val number get() = name.split(" ", limit = 2)[1]
+    val number get() = CHAP_NUM_REGEX.find(name)?.value ?: "-1"
 }
+
+private val CHAP_NUM_REGEX = Regex("""\d+(\.\d+)?""")
 
 val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZZZZ", Locale.US)
 
