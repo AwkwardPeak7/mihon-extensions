@@ -7,7 +7,9 @@ import android.os.Bundle
 import android.util.Log
 import kotlin.system.exitProcess
 
-class HeanCmsUrlActivity : Activity() {
+class OmegaScansUrlActivity : Activity() {
+    private val name = this.javaClass.getSimpleName()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val pathSegments = intent?.data?.pathSegments
@@ -21,10 +23,10 @@ class HeanCmsUrlActivity : Activity() {
             try {
                 startActivity(mainIntent)
             } catch (e: ActivityNotFoundException) {
-                Log.e("HeanCmsUrlActivity", e.toString())
+                Log.e(name, e.toString())
             }
         } else {
-            Log.e("HeanCmsUrlActivity", "could not parse uri from intent $intent")
+            Log.e(name, "could not parse uri from intent $intent")
         }
 
         finish()
@@ -34,7 +36,7 @@ class HeanCmsUrlActivity : Activity() {
     private fun createQuery(pathSegments: MutableList<String>): String? {
         return if (pathSegments.size >= 2) {
             val slug = pathSegments[1]
-            "${HeanCms.SEARCH_PREFIX}$slug"
+            "${OmegaScans.SEARCH_PREFIX}$slug"
         } else {
             null
         }

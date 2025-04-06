@@ -3,7 +3,7 @@
 
     <application>
         <activity
-            android:name="eu.kanade.tachiyomi.multisrc.heancms.HeanCmsUrlActivity"
+            android:name="io.github.awkwardpeak.extension.en.omegascans.HeanCmsUrlActivity"
             android:excludeFromRecents="true"
             android:exported="true"
             android:theme="@android:style/Theme.NoDisplay">
