@@ -1,0 +1,10 @@
+ext {
+    extName = 'Omega Scans'
+    extClass = '.OmegaScans'
+    baseUrl = 'https://omegascans.org'
+    extVersionCode = 1
+    isNsfw = true
+}
+
+apply from: "$rootDir/common.gradle"
+
