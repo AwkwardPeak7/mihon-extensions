@@ -96,23 +96,10 @@ class OmegaScans : ConfigurableSource, HttpSource() {
 
         val slug = query.substringAfter(SEARCH_PREFIX)
         val manga = SManga.create().apply {
-            val mangaId = getIdBySlug(slug)
-            url = "/$mangaSubDirectory/$slug#$mangaId"
+            url = "/$mangaSubDirectory/$slug"
         }
 
         return fetchMangaDetails(manga).map { MangasPage(listOf(it), false) }
-    }
-
-    private fun getIdBySlug(slug: String): Int {
-        val result = runCatching {
-            val response = client.newCall(GET("$apiUrl/series/$slug", headers)).execute()
-            val json = response.body.string()
-
-            val seriesDetail = json.parseAs<HeanCmsSeriesDto>()
-
-            seriesDetail.id
-        }
-        return result.getOrNull() ?: throw Exception("Failed to get the ID for slug: $slug")
     }
 
     override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
@@ -158,10 +145,6 @@ class OmegaScans : ConfigurableSource, HttpSource() {
     }
 
     override fun mangaDetailsRequest(manga: SManga): Request {
-        if (!manga.url.contains("#")) {
-            throw Exception("The URL of the series has changed. Migrate from $name to $name to update the URL")
-        }
-
         val seriesSlug = manga.url.substringAfterLast("/").substringBefore("#")
 
         val apiHeaders = headersBuilder()
@@ -172,19 +155,9 @@ class OmegaScans : ConfigurableSource, HttpSource() {
     }
 
     override fun mangaDetailsParse(response: Response): SManga {
-        val mangaStatus = response.request.url.fragment?.toIntOrNull() ?: SManga.UNKNOWN
+        val result = response.parseAs<HeanCmsSeriesDto>()
 
-        val result = runCatching { response.parseAs<HeanCmsSeriesDto>() }
-
-        val seriesResult = result.getOrNull()
-            ?: throw Exception("The URL of the series has changed. Migrate from $name to $name to update the URL")
-
-        val seriesDetails = seriesResult.toSManga(cdnUrl, coverPath, mangaSubDirectory)
-
-        return seriesDetails.apply {
-            status = status.takeUnless { it == SManga.UNKNOWN }
-                ?: mangaStatus
-        }
+        return result.toSManga(cdnUrl, coverPath, mangaSubDirectory)
     }
 
     override fun chapterListRequest(manga: SManga): Request {
