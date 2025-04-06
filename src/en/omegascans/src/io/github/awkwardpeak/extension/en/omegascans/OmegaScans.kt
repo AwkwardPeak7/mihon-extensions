@@ -1,10 +1,9 @@
 package io.github.awkwardpeak.extension.en.omegascans
 
 import android.content.SharedPreferences
-import androidx.preference.PreferenceScreen
-import androidx.preference.SwitchPreferenceCompat
 import eu.kanade.tachiyomi.network.GET
-import eu.kanade.tachiyomi.source.ConfigurableSource
+import eu.kanade.tachiyomi.network.asObservableSuccess
+import eu.kanade.tachiyomi.network.await
 import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
@@ -14,7 +13,16 @@ import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
 import keiyoushi.utils.firstInstanceOrNull
 import keiyoushi.utils.getPreferencesLazy
+import keiyoushi.utils.jsonInstance
 import keiyoushi.utils.parseAs
+import keiyoushi.utils.tryParse
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -22,7 +30,7 @@ import okhttp3.Response
 import rx.Observable
 import kotlin.concurrent.thread
 
-class OmegaScans : ConfigurableSource, HttpSource() {
+class OmegaScans : HttpSource() {
 
     override val name = "Omega Scans"
 
@@ -153,6 +161,14 @@ class OmegaScans : ConfigurableSource, HttpSource() {
     }
 
     override fun chapterListRequest(manga: SManga): Request {
+        throw UnsupportedOperationException()
+    }
+
+    override fun chapterListParse(response: Response): List<SChapter> {
+        throw UnsupportedOperationException()
+    }
+
+    private suspend fun getBaseChapters(manga: SManga): List<HeanCmsChapterDto> {
         if (!manga.url.contains("#")) {
             throw Exception("The URL of the series has changed. Migrate from $name to $name to update the URL")
         }
@@ -160,55 +176,116 @@ class OmegaScans : ConfigurableSource, HttpSource() {
         val seriesId = manga.url.substringAfterLast("#")
         val seriesSlug = manga.url.substringAfterLast("/").substringBefore("#")
 
-        val url = "$apiUrl/chapter/query".toHttpUrl().newBuilder()
-            .addQueryParameter("page", "1")
-            .addQueryParameter("perPage", PER_PAGE_CHAPTERS.toString())
-            .addQueryParameter("series_id", seriesId)
-            .fragment(seriesSlug)
-
-        return GET(url.build(), headers)
-    }
-
-    override fun chapterListParse(response: Response): List<SChapter> {
-        val showPaidChapters = preferences.showPaidChapters
-
         val apiHeaders = headersBuilder()
             .add("Accept", ACCEPT_JSON)
             .build()
 
-        val seriesId = response.request.url.queryParameter("series_id")
-
-        val seriesSlug = response.request.url.fragment!!
-
-        var result = response.parseAs<HeanCmsChapterPayloadDto>()
-
-        val currentTimestamp = System.currentTimeMillis()
-
         val chapterList = mutableListOf<HeanCmsChapterDto>()
 
-        chapterList.addAll(result.data)
+        var page = 1
+        var hasNextPage: Boolean
 
-        var page = 2
-        while (result.meta.hasNextPage()) {
+        do {
             val url = "$apiUrl/chapter/query".toHttpUrl().newBuilder()
-                .addQueryParameter("page", page.toString())
+                .addQueryParameter("page", "1")
                 .addQueryParameter("perPage", PER_PAGE_CHAPTERS.toString())
                 .addQueryParameter("series_id", seriesId)
+                .fragment(seriesSlug)
                 .build()
 
-            val nextResponse = client.newCall(GET(url, apiHeaders)).execute()
-            result = nextResponse.parseAs<HeanCmsChapterPayloadDto>()
+            val result = client.newCall(GET(url, apiHeaders)).await()
+                .parseAs<HeanCmsChapterPayloadDto>()
+
             chapterList.addAll(result.data)
+            hasNextPage = result.meta.hasNextPage()
             page++
-        }
+        } while (hasNextPage)
 
         return chapterList
-            .filter { it.price == 0 || showPaidChapters }
-            .map { it.toSChapter(seriesSlug) }
-            .filter { it.date_upload <= currentTimestamp }
     }
 
-    override fun getChapterUrl(chapter: SChapter) = baseUrl + chapter.url.substringBeforeLast("#")
+    override fun fetchChapterList(manga: SManga): Observable<List<SChapter>> = runBlocking {
+        val baseChaptersDeferred = async { getBaseChapters(manga) }
+        val cubariChaptersDeferred = async { PaidChapterHelper.getCubariChapters(manga.title) }
+
+        val baseChapters = baseChaptersDeferred.await()
+        val cubariChapters = cubariChaptersDeferred.await()?.chapters ?: mapOf()
+
+        val seriesSlug = manga.url.substringAfterLast("/").substringBefore("#")
+
+        val cubariSeriesCache = mutableMapOf<Int, String>()
+
+        val chapters = baseChapters.mapNotNull { baseChapter ->
+            val cubari = cubariChapters[baseChapter.number]
+
+            SChapter.create().apply {
+                url = "/series/$seriesSlug/${baseChapter.slug}#${baseChapter.id}"
+
+                name = baseChapter.name.trim()
+
+                if (baseChapter.title != null) {
+                    name += " - ${baseChapter.title.trim()}"
+                }
+
+                if (baseChapter.price != 0) {
+                    cubari?.also {
+                        cubariSeriesCache[baseChapter.id] = cubari.url
+                            .replace("/proxy/", "/read/")
+                            .removeSuffix("/")
+                            .plus("/")
+                        scanlator = "Early Access"
+                    } ?: return@mapNotNull null
+                }
+
+                date_upload = cubari?.lastUpdated ?: dateFormat.tryParse(baseChapter.createdAt)
+            }
+        }
+
+        setCubariSeriesCache(seriesSlug, cubariSeriesCache)
+
+        Observable.just(chapters)
+    }
+
+    override fun getChapterUrl(chapter: SChapter): String {
+        val (seriesSlug, chapterId) = "$baseUrl${chapter.url}".toHttpUrl().let {
+            it.pathSegments[1] to it.fragment!!.toInt()
+        }
+
+        val cubariUrl = getCubariSeriesCache(seriesSlug)[chapterId]
+            ?.replace("/api/", "/")
+            ?.replace("/chapter/", "/")
+            ?.let { "https://cubari.moe$it" }
+
+        return cubariUrl ?: (baseUrl + chapter.url.substringBeforeLast("#"))
+    }
+
+    override fun fetchPageList(chapter: SChapter): Observable<List<Page>> {
+        val (seriesSlug, chapterId) = "$baseUrl${chapter.url}".toHttpUrl().let {
+            it.pathSegments[1] to it.fragment!!.toInt()
+        }
+
+        val cubariUrl = getCubariSeriesCache(seriesSlug)[chapterId]
+            ?.let { "https://cubari.moe$it" }
+
+        return cubariUrl?.let { getCubariPageList(it) }
+            ?: super.fetchPageList(chapter)
+    }
+
+    private fun getCubariPageList(url: String): Observable<List<Page>> {
+        return client.newCall(GET(url))
+            .asObservableSuccess()
+            .map { response ->
+                response.parseAs<List<JsonElement>>().map {
+                    val page = if (it is JsonObject) {
+                        it.jsonObject["src"]!!.jsonPrimitive.content
+                    } else {
+                        it.jsonPrimitive.content
+                    }
+
+                    Page(0, imageUrl = "$page#cubari")
+                }
+            }
+    }
 
     override fun pageListRequest(chapter: SChapter) =
         GET(apiUrl + chapter.url.replace("/series/", "/chapter/"), headers)
@@ -225,16 +302,18 @@ class OmegaScans : ConfigurableSource, HttpSource() {
         }
     }
 
-    override fun fetchImageUrl(page: Page): Observable<String> = Observable.just(page.imageUrl!!)
-
     override fun imageUrlParse(response: Response): String = ""
 
     override fun imageRequest(page: Page): Request {
-        val imageHeaders = headersBuilder()
-            .add("Accept", ACCEPT_IMAGE)
-            .build()
+        return if (page.imageUrl!!.contains("#cubari")) {
+            GET(page.imageUrl!!)
+        } else {
+            val imageHeaders = headersBuilder()
+                .add("Accept", ACCEPT_IMAGE)
+                .build()
 
-        return GET(page.imageUrl!!, imageHeaders)
+            return GET(page.imageUrl!!, imageHeaders)
+        }
     }
 
     private fun getStatusList(): List<Status> = listOf(
@@ -297,18 +376,27 @@ class OmegaScans : ConfigurableSource, HttpSource() {
         return FilterList(filters)
     }
 
-    override fun setupPreferenceScreen(screen: PreferenceScreen) {
-        SwitchPreferenceCompat(screen.context).apply {
-            key = SHOW_PAID_CHAPTERS_PREF
-            title = "Display paid chapters"
-            summaryOn = "Paid chapters will appear."
-            summaryOff = "Only free chapters will be displayed."
-            setDefaultValue(SHOW_PAID_CHAPTERS_DEFAULT)
-        }.also(screen::addPreference)
+    // series id to chapter id to cubari
+    private fun getCubariSeriesCache(seriesSlug: String): Map<Int, String> = synchronized(preferences) {
+        val map = preferences.getString(CUBARI_CACHE, "{}")!!.parseAs<Map<String, Map<Int, String>>>()
+
+        return map[seriesSlug] ?: mapOf()
     }
 
-    private val SharedPreferences.showPaidChapters: Boolean
-        get() = getBoolean(SHOW_PAID_CHAPTERS_PREF, SHOW_PAID_CHAPTERS_DEFAULT)
+    private fun setCubariSeriesCache(seriesSlug: String, seriesMap: Map<Int, String>) = synchronized(preferences) {
+        val map = preferences.getString(CUBARI_CACHE, "{}")!!
+            .parseAs<MutableMap<String, Map<Int, String>>>()
+
+        if (seriesMap.isEmpty()) {
+            map.remove(seriesSlug)
+        } else {
+            map[seriesSlug] = seriesMap
+        }
+
+        preferences.edit()
+            .putString(CUBARI_CACHE, jsonInstance.encodeToString(map))
+            .commit()
+    }
 
     private enum class FiltersState { NOT_FETCHED, FETCHING, FETCHED }
 
@@ -320,7 +408,6 @@ class OmegaScans : ConfigurableSource, HttpSource() {
 
         const val SEARCH_PREFIX = "slug:"
 
-        private const val SHOW_PAID_CHAPTERS_PREF = "pref_show_paid_chap"
-        private const val SHOW_PAID_CHAPTERS_DEFAULT = false
+        private const val CUBARI_CACHE = "cubari_cache"
     }
 }

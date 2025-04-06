@@ -1,8 +1,6 @@
 package io.github.awkwardpeak.extension.en.omegascans
 
-import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
-import keiyoushi.utils.tryParse
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jsoup.Jsoup
@@ -68,30 +66,14 @@ class HeanCmsChapterPayloadDto(
 
 @Serializable
 class HeanCmsChapterDto(
-    private val id: Int,
-    @SerialName("chapter_name") private val name: String,
-    @SerialName("chapter_title") private val title: String? = null,
-    @SerialName("chapter_slug") private val slug: String,
-    @SerialName("created_at") private val createdAt: String? = null,
+    val id: Int,
+    @SerialName("chapter_name") val name: String,
+    @SerialName("chapter_title") val title: String? = null,
+    @SerialName("chapter_slug") val slug: String,
+    @SerialName("created_at") val createdAt: String? = null,
     val price: Int? = null,
 ) {
-    fun toSChapter(
-        seriesSlug: String,
-    ): SChapter = SChapter.create().apply {
-        name = this@HeanCmsChapterDto.name.trim()
-
-        if (title != null) {
-            name += " - ${title.trim()}"
-        }
-
-        if (price != 0) {
-            name += " \uD83D\uDD12"
-        }
-
-        date_upload = dateFormat.tryParse(createdAt)
-
-        url = "/series/$seriesSlug/$slug#$id"
-    }
+    val number get() = name.split(" ", limit = 2)[1]
 }
 
 val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZZZZ", Locale.US)
