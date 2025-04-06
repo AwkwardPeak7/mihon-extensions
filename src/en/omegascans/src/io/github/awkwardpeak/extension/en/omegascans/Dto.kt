@@ -2,37 +2,12 @@ package io.github.awkwardpeak.extension.en.omegascans
 
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
+import keiyoushi.utils.tryParse
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jsoup.Jsoup
 import java.text.SimpleDateFormat
-
-@Serializable
-class HeanCmsTokenPayloadDto(
-    val token: String? = null,
-    private val expiresAt: String? = null,
-) {
-    fun isExpired(dateFormat: SimpleDateFormat): Boolean {
-        val expiredTime = try {
-            // Reduce one day to prevent timezone issues
-            expiresAt?.let { dateFormat.parse(it)?.time?.minus(1000 * 60 * 60 * 24) } ?: 0L
-        } catch (_: Exception) {
-            0L
-        }
-
-        return System.currentTimeMillis() > expiredTime
-    }
-}
-
-@Serializable
-class HeanCmsErrorsDto(
-    val errors: List<HeanCmsErrorMessageDto>? = emptyList(),
-)
-
-@Serializable
-class HeanCmsErrorMessageDto(
-    val message: String,
-)
+import java.util.Locale
 
 @Serializable
 class HeanCmsQuerySearchDto(
@@ -50,7 +25,7 @@ class HeanCmsQuerySearchMetaDto(
 
 @Serializable
 class HeanCmsSeriesDto(
-    val id: Int,
+    private val id: Int,
     @SerialName("series_slug") val slug: String,
     private val author: String? = null,
     private val description: String? = null,
@@ -59,13 +34,10 @@ class HeanCmsSeriesDto(
     private val thumbnail: String,
     private val title: String,
     private val tags: List<HeanCmsTagDto>? = emptyList(),
-    val seasons: List<HeanCmsSeasonsDto>? = emptyList(),
 ) {
 
     fun toSManga(
         cdnUrl: String,
-        coverPath: String,
-        mangaSubDirectory: String,
     ): SManga = SManga.create().apply {
         val descriptionBody = this@HeanCmsSeriesDto.description?.let(Jsoup::parseBodyFragment)
 
@@ -79,16 +51,11 @@ class HeanCmsSeriesDto(
             .sortedBy(HeanCmsTagDto::name)
             .joinToString { it.name }
         thumbnail_url = thumbnail.ifEmpty { null }
-            ?.toAbsoluteThumbnailUrl(cdnUrl, coverPath)
+            ?.toAbsoluteUrl(cdnUrl)
         status = this@HeanCmsSeriesDto.status?.toStatus() ?: SManga.UNKNOWN
-        url = "/$mangaSubDirectory/$slug#$id"
+        url = "/series/$slug#$id"
     }
 }
-
-@Serializable
-class HeanCmsSeasonsDto(
-    val chapters: List<HeanCmsChapterDto>? = emptyList(),
-)
 
 @Serializable
 class HeanCmsTagDto(val name: String)
@@ -110,8 +77,6 @@ class HeanCmsChapterDto(
 ) {
     fun toSChapter(
         seriesSlug: String,
-        mangaSubDirectory: String,
-        dateFormat: SimpleDateFormat,
     ): SChapter = SChapter.create().apply {
         name = this@HeanCmsChapterDto.name.trim()
 
@@ -123,15 +88,13 @@ class HeanCmsChapterDto(
             name += " \uD83D\uDD12"
         }
 
-        date_upload = try {
-            dateFormat.parse(createdAt)?.time ?: 0L
-        } catch (_: Exception) {
-            0L
-        }
+        date_upload = dateFormat.tryParse(createdAt)
 
-        url = "/$mangaSubDirectory/$seriesSlug/$slug#$id"
+        url = "/series/$seriesSlug/$slug#$id"
     }
 }
+
+val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZZZZ", Locale.US)
 
 @Serializable
 class HeanCmsChapterMetaDto(
@@ -145,7 +108,6 @@ class HeanCmsChapterMetaDto(
 class HeanCmsPagePayloadDto(
     val chapter: HeanCmsPageDto,
     private val paywall: Boolean = false,
-    val data: List<String>? = emptyList(),
 ) {
     fun isPaywalled() = paywall
 }
@@ -166,8 +128,8 @@ class HeanCmsGenreDto(
     val name: String,
 )
 
-private fun String.toAbsoluteThumbnailUrl(cdnUrl: String, coverPath: String): String {
-    return if (startsWith("https://") || startsWith("http://")) this else "$cdnUrl/$coverPath$this"
+fun String.toAbsoluteUrl(cdnUrl: String): String {
+    return if (startsWith("https://") || startsWith("http://")) this else "$cdnUrl/$this"
 }
 
 fun String.toStatus(): Int = when (this) {

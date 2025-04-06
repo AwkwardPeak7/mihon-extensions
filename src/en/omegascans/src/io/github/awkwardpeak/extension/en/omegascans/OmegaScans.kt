@@ -20,8 +20,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import rx.Observable
-import java.text.SimpleDateFormat
-import java.util.Locale
 import kotlin.concurrent.thread
 
 class OmegaScans : ConfigurableSource, HttpSource() {
@@ -43,13 +41,7 @@ class OmegaScans : ConfigurableSource, HttpSource() {
 
     override val client: OkHttpClient = network.cloudflareClient
 
-    private val coverPath: String = ""
-
     private val cdnUrl = apiUrl
-
-    private val mangaSubDirectory: String = "series"
-
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZZZZZ", Locale.US)
 
     override fun headersBuilder() = super.headersBuilder()
         .add("Origin", baseUrl)
@@ -96,7 +88,7 @@ class OmegaScans : ConfigurableSource, HttpSource() {
 
         val slug = query.substringAfter(SEARCH_PREFIX)
         val manga = SManga.create().apply {
-            url = "/$mangaSubDirectory/$slug"
+            url = "/series/$slug"
         }
 
         return fetchMangaDetails(manga).map { MangasPage(listOf(it), false) }
@@ -130,7 +122,7 @@ class OmegaScans : ConfigurableSource, HttpSource() {
 
         val result = json.parseAs<HeanCmsQuerySearchDto>()
         val mangaList = result.data.map {
-            it.toSManga(cdnUrl, coverPath, mangaSubDirectory)
+            it.toSManga(cdnUrl)
         }
 
         return MangasPage(mangaList, result.meta?.hasNextPage() ?: false)
@@ -141,7 +133,7 @@ class OmegaScans : ConfigurableSource, HttpSource() {
             .substringAfterLast("/")
             .substringBefore("#")
 
-        return "$baseUrl/$mangaSubDirectory/$seriesSlug"
+        return "$baseUrl/series/$seriesSlug"
     }
 
     override fun mangaDetailsRequest(manga: SManga): Request {
@@ -157,7 +149,7 @@ class OmegaScans : ConfigurableSource, HttpSource() {
     override fun mangaDetailsParse(response: Response): SManga {
         val result = response.parseAs<HeanCmsSeriesDto>()
 
-        return result.toSManga(cdnUrl, coverPath, mangaSubDirectory)
+        return result.toSManga(cdnUrl)
     }
 
     override fun chapterListRequest(manga: SManga): Request {
@@ -212,14 +204,14 @@ class OmegaScans : ConfigurableSource, HttpSource() {
 
         return chapterList
             .filter { it.price == 0 || showPaidChapters }
-            .map { it.toSChapter(seriesSlug, mangaSubDirectory, dateFormat) }
+            .map { it.toSChapter(seriesSlug) }
             .filter { it.date_upload <= currentTimestamp }
     }
 
     override fun getChapterUrl(chapter: SChapter) = baseUrl + chapter.url.substringBeforeLast("#")
 
     override fun pageListRequest(chapter: SChapter) =
-        GET(apiUrl + chapter.url.replace("/$mangaSubDirectory/", "/chapter/"), headers)
+        GET(apiUrl + chapter.url.replace("/series/", "/chapter/"), headers)
 
     override fun pageListParse(response: Response): List<Page> {
         val result = response.parseAs<HeanCmsPagePayloadDto>()
@@ -229,12 +221,8 @@ class OmegaScans : ConfigurableSource, HttpSource() {
         }
 
         return result.chapter.chapterData?.images.orEmpty().mapIndexed { i, img ->
-            Page(i, imageUrl = img.toAbsoluteUrl())
+            Page(i, imageUrl = img.toAbsoluteUrl(cdnUrl))
         }
-    }
-
-    private fun String.toAbsoluteUrl(): String {
-        return if (startsWith("https://") || startsWith("http://")) this else "$cdnUrl/$coverPath$this"
     }
 
     override fun fetchImageUrl(page: Page): Observable<String> = Observable.just(page.imageUrl!!)
