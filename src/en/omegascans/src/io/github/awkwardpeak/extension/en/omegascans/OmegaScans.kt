@@ -187,7 +187,7 @@ class OmegaScans : HttpSource() {
 
         do {
             val url = "$apiUrl/chapter/query".toHttpUrl().newBuilder()
-                .addQueryParameter("page", "1")
+                .addQueryParameter("page", page.toString())
                 .addQueryParameter("perPage", PER_PAGE_CHAPTERS.toString())
                 .addQueryParameter("series_id", seriesId)
                 .fragment(seriesSlug)

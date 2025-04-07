@@ -2,7 +2,7 @@ ext {
     extName = 'Omega Scans'
     extClass = '.OmegaScans'
     baseUrl = 'https://omegascans.org'
-    extVersionCode = 2
+    extVersionCode = 3
     isNsfw = true
 }
 
