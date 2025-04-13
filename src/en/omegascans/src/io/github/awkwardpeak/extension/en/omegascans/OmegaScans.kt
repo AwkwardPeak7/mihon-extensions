@@ -227,6 +227,8 @@ class OmegaScans : HttpSource() {
                     name += " - ${baseChapter.title.trim()}"
                 }
 
+                scanlator = "​​​​\u200B"
+
                 if (baseChapter.price != 0) {
                     cubari?.also {
                         cubariSeriesCache[baseChapter.id] = cubari.url
