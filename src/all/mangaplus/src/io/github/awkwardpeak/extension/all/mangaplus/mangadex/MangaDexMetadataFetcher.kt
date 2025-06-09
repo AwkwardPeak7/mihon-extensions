@@ -6,7 +6,6 @@ import eu.kanade.tachiyomi.network.interceptor.rateLimit
 import keiyoushi.utils.parseAs
 import okhttp3.CacheControl
 import okhttp3.HttpUrl.Companion.toHttpUrl
-import okhttp3.internal.commonEmptyHeaders
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
@@ -51,7 +50,7 @@ object MangaDexMetadataFetcher {
                 }
             }.build()
 
-            val response = client.newCall(GET(url, commonEmptyHeaders)).execute()
+            val response = client.newCall(GET(url)).execute()
                 .parseAs<MangasResponse>()
 
             data += response.data
