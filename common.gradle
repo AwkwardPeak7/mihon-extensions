@@ -18,6 +18,17 @@ android {
     sourceSets {
         main {
             manifest.srcFile "AndroidManifest.xml"
+            if (!manifest.srcFile.exists()) {
+                def buildDir = layout.buildDirectory.get().getAsFile().path
+                mkdir(buildDir)
+                File tempFile = new File(buildDir, "tempAndroidManifest.xml")
+                if (!tempFile.exists()) {
+                    tempFile.withWriter {
+                        it.write('<?xml version="1.0" encoding="utf-8"?>\n<manifest />\n')
+                    }
+                }
+                manifest.srcFile(tempFile.path)
+            }
             java.srcDirs = ['src']
             res.srcDirs = ['res']
             assets.srcDirs = ['assets']
@@ -106,22 +117,6 @@ dependencies {
     implementation(project(":utils"))
 }
 
-tasks.register("writeManifestFile") {
-    doLast {
-        def manifest = android.sourceSets.getByName("main").manifest
-        if (!manifest.srcFile.exists()) {
-            File tempFile = layout.buildDirectory.get().file("tempAndroidManifest.xml").getAsFile()
-            if (!tempFile.exists()) {
-                tempFile.withWriter {
-                    it.write('<?xml version="1.0" encoding="utf-8"?>\n<manifest />\n')
-                }
-            }
-            manifest.srcFile(tempFile.path)
-        }
-    }
-}
-
-preBuild.dependsOn(writeManifestFile, lintKotlin)
 if (System.getenv("CI") != "true") {
     lintKotlin.dependsOn(formatKotlin)
 }
