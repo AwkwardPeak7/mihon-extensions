@@ -21,6 +21,12 @@ object PaidChapterHelper {
         Charset.forName("UTF-8"),
     )
 
+    val cachedList = javaClass.getResourceAsStream("/assets/cubari.json")
+        ?.bufferedReader()
+        ?.use { it.readText() }
+        ?.parseAs<Map<String, String>>()
+        ?: mapOf()
+
     private val cubariList by lazy {
         val url = "https://api.github.com/repos/$repo/git/trees/master?recursive=1"
 
@@ -62,7 +68,7 @@ object PaidChapterHelper {
     }
 
     suspend fun getCubariChapters(title: String): CubariChaptersResponse? {
-        val jsonFile = getClosest(title)
+        val jsonFile = cachedList[title] ?: getClosest(title)
             ?: return null
 
         val url = "https://raw.githubusercontent.com/$repo/refs/heads/master/$jsonFile"
