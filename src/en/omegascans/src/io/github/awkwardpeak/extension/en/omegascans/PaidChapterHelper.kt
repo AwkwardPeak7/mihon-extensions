@@ -21,7 +21,10 @@ object PaidChapterHelper {
         Charset.forName("UTF-8"),
     )
 
-    val cachedList = javaClass.getResourceAsStream("/assets/cubari.json")
+    /**
+     * contains all those which have jc < 0.6 but should match
+     */
+    val hardcodedList = javaClass.getResourceAsStream("/assets/cubari.json")
         ?.bufferedReader()
         ?.use { it.readText() }
         ?.parseAs<Map<String, String>>()
@@ -42,7 +45,9 @@ object PaidChapterHelper {
             }
     }
 
-    private fun getClosest(title: String): String? {
+    private fun getCubariClosest(title: String): String? {
+        hardcodedList[title]?.also { return it }
+
         val cleanedTitle = title.filter { it.isLetterOrDigit() || it == ' ' }.lowercase()
 
         var jc = 0.0
@@ -68,7 +73,7 @@ object PaidChapterHelper {
     }
 
     suspend fun getCubariChapters(title: String): CubariChaptersResponse? {
-        val jsonFile = cachedList[title] ?: getClosest(title)
+        val jsonFile = getCubariClosest(title)
             ?: return null
 
         val url = "https://raw.githubusercontent.com/$repo/refs/heads/master/$jsonFile"
