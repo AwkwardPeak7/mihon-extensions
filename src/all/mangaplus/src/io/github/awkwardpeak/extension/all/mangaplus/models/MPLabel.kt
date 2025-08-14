@@ -20,6 +20,7 @@ data class MPLabel(
             MPLabelCode.SAIKYOU_JUMP -> "Saikyou Jump"
             MPLabelCode.MANGA_MEE -> "Manga Mee"
             MPLabelCode.ULTRA_JUMP -> "Ultra Jump"
+            MPLabelCode.DX -> "Dash X Comic"
             else -> null
         }
 }
@@ -39,4 +40,5 @@ enum class MPLabelCode {
     SAIKYOU_JUMP,
     SHOUNEN_JUMP_GIGA,
     ULTRA_JUMP,
+    DX
 }
