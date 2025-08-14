@@ -523,7 +523,7 @@ private const val PREF_IMAGE_QUALITY = "imageResolution"
 private const val PREF_SPLIT_DOUBLE_PAGES = "splitImage"
 private const val PREF_HIDE_PAID_CHAPTERS = "hidePaidChapters"
 
-private const val APP_VER = "217"
+private const val APP_VER = "221"
 
 private fun ByteArray.toHex(): String = joinToString(separator = "") { eachByte -> "%02x".format(eachByte) }
 
