@@ -17,6 +17,7 @@ import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
 import io.github.awkwardpeak.extension.all.mangaplus.mangadex.MangaDexMetadataFetcher
+import io.github.awkwardpeak.extension.all.mangaplus.models.ChapterType
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPErrorAction
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPLanguage
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPResponse
@@ -117,8 +118,7 @@ class MangaPlus(private val mpLang: MPLanguage) : HttpSource(), ConfigurableSour
         val manga = directory.drop((page - 1) * 24).take(24)
 
         val covers = MangaDexMetadataFetcher.getCovers(
-            manga.map { it.titleId.toString() },
-            small = true,
+            manga.map { it.titleId.toString() }
         )
 
         val entries = manga.map {
@@ -265,10 +265,9 @@ class MangaPlus(private val mpLang: MPLanguage) : HttpSource(), ConfigurableSour
             data.titleLabels.planType == "deluxe" &&
             data.userSubscription.planType != "deluxe"
         ) {
-            data.chapterListGroup
-                .flatMap { it.firstChapterList + it.lastChapterList }
+            data.chapterListV2.filter { it.chapterType != ChapterType.DELUX }
         } else {
-            data.chapterList
+            data.chapterListV2
         }
             .map { it.toSChapter() }
 
@@ -523,7 +522,7 @@ private const val PREF_IMAGE_QUALITY = "imageResolution"
 private const val PREF_SPLIT_DOUBLE_PAGES = "splitImage"
 private const val PREF_HIDE_PAID_CHAPTERS = "hidePaidChapters"
 
-private const val APP_VER = "223"
+private const val APP_VER = "235"
 
 private fun ByteArray.toHex(): String = joinToString(separator = "") { eachByte -> "%02x".format(eachByte) }
 

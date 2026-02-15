@@ -26,7 +26,7 @@ object MangaDexMetadataFetcher {
         ).execute().parseAs()
     }
 
-    fun getCovers(ids: List<String>, small: Boolean = false): Map<String, String?> {
+    fun getCovers(ids: List<String>): Map<String, String?> {
         var offset = 0
         var total: Int
         val data = mutableListOf<Manga>()
@@ -68,18 +68,13 @@ object MangaDexMetadataFetcher {
 
             uuid?.let { mdexUUid ->
                 coverMap[mdexUUid]?.let { file ->
-                    "https://uploads.mangadex.org/covers/$mdexUUid/$file" +
-                        if (small) {
-                            ".512.jpg"
-                        } else {
-                            ""
-                        }
+                    "https://uploads.mangadex.org/covers/$mdexUUid/$file"
                 }
             }
         }
     }
 
-    fun getCover(id: String, small: Boolean = false): String? {
-        return getCovers(listOf(id), small)[id]
+    fun getCover(id: String): String? {
+        return getCovers(listOf(id))[id]
     }
 }

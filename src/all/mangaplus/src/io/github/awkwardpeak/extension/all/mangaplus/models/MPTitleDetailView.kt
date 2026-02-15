@@ -23,21 +23,17 @@ data class MPTitleDetailView(
     @ProtoNumber(14) val isSimulReleased: Boolean = false,
     @ProtoNumber(16) val rating: MPContentRating = MPContentRating.ALL_AGES,
     @ProtoNumber(17) val chaptersDescending: Boolean = true,
-    @ProtoNumber(28) val chapterListGroup: List<MPChapterListGroup> = emptyList(),
     @ProtoNumber(32) val titleLabels: MPTitleLabels,
     @ProtoNumber(33) val userSubscription: MPUserSubscription,
     @ProtoNumber(34) val label: MPLabel? = MPLabel(MPLabelCode.WEEKLY_SHOUNEN_JUMP),
+    @ProtoNumber(38) val chapterListV2: List<MPChapter> = emptyList()
 ) {
-    val chapterList: List<MPChapter> by lazy {
-        chapterListGroup.flatMap { it.firstChapterList + it.midChapterList + it.lastChapterList }
-    }
-
     private val isWebtoon: Boolean
-        get() = chapterList.isNotEmpty() && chapterList.all { it.isVerticalOnly }
+        get() = chapterListV2.isNotEmpty() && chapterListV2.all { it.isVerticalOnly }
 
     private val isOneShot: Boolean
         get() {
-            if (chapterList.size != 1) {
+            if (chapterListV2.size != 1) {
                 return false
             }
 
@@ -47,7 +43,7 @@ data class MPTitleDetailView(
                 return true
             }
 
-            return chapterList.first().name.contains("one-shot", false)
+            return chapterListV2.first().name.contains("one-shot", false)
         }
 
     private val isReEdition: Boolean
@@ -143,14 +139,6 @@ enum class MPContentRating {
 }
 
 @Serializable
-data class MPChapterListGroup(
-    @ProtoNumber(1) val chapterNumbers: String,
-    @ProtoNumber(2) val firstChapterList: List<MPChapter> = emptyList(),
-    @ProtoNumber(3) val midChapterList: List<MPChapter> = emptyList(),
-    @ProtoNumber(4) val lastChapterList: List<MPChapter> = emptyList(),
-)
-
-@Serializable
 data class MPChapter(
     @ProtoNumber(1) val titleId: Int,
     @ProtoNumber(2) val chapterId: Int,
@@ -158,6 +146,7 @@ data class MPChapter(
     @ProtoNumber(4) val subTitle: String,
     @ProtoNumber(6) val startTimeStamp: Long,
     @ProtoNumber(9) val isVerticalOnly: Boolean = false,
+    @ProtoNumber(16) val chapterType: ChapterType = ChapterType.FREE
 ) {
     fun toSChapter() = SChapter.create().apply {
         url = "#/viewer/$chapterId"
@@ -208,4 +197,12 @@ data class MPChapter(
             numbers.toFloat()
         }
     }
+}
+
+@Serializable
+enum class ChapterType {
+    FREE,
+    FREE_FOR_FIRST_TIME,
+    ANOTHER, // idk
+    DELUX,
 }
