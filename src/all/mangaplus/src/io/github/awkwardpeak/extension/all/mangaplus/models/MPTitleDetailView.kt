@@ -2,7 +2,7 @@ package io.github.awkwardpeak.extension.all.mangaplus.models
 
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
-import io.github.awkwardpeak.lib.i18n.Intl
+import keiyoushi.lib.i18n.Intl
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoNumber
 
@@ -26,7 +26,7 @@ data class MPTitleDetailView(
     @ProtoNumber(32) val titleLabels: MPTitleLabels,
     @ProtoNumber(33) val userSubscription: MPUserSubscription,
     @ProtoNumber(34) val label: MPLabel? = MPLabel(MPLabelCode.WEEKLY_SHOUNEN_JUMP),
-    @ProtoNumber(38) val chapterListV2: List<MPChapter> = emptyList()
+    @ProtoNumber(38) val chapterListV2: List<MPChapter> = emptyList(),
 ) {
     private val isWebtoon: Boolean
         get() = chapterListV2.isNotEmpty() && chapterListV2.all { it.isVerticalOnly }
@@ -146,7 +146,7 @@ data class MPChapter(
     @ProtoNumber(4) val subTitle: String,
     @ProtoNumber(6) val startTimeStamp: Long,
     @ProtoNumber(9) val isVerticalOnly: Boolean = false,
-    @ProtoNumber(16) val chapterType: ChapterType = ChapterType.FREE
+    @ProtoNumber(16) val chapterType: ChapterType = ChapterType.FREE,
 ) {
     fun toSChapter() = SChapter.create().apply {
         url = "#/viewer/$chapterId"

@@ -7,7 +7,7 @@ import io.github.awkwardpeak.extension.all.mangaplus.models.MPLabel
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPLabelCode
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPLanguage
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPTitle
-import io.github.awkwardpeak.lib.i18n.Intl
+import keiyoushi.lib.i18n.Intl
 
 object MangaPlusFilters {
     fun getFilterList(intl: Intl): FilterList = FilterList(
@@ -84,7 +84,9 @@ object MangaPlusFilters {
         fun retainMatchingTitles(titles: MutableList<MPAllTitlesGroup>)
     }
 
-    private class AuthorFilter(intl: Intl) : Filter.Text(intl["author"]), Filterable {
+    private class AuthorFilter(intl: Intl) :
+        Filter.Text(intl["author"]),
+        Filterable {
         override fun retainMatchingTitles(titles: MutableList<MPAllTitlesGroup>) {
             if (state.isNotEmpty()) {
                 titles.retainAll { tg ->
@@ -130,7 +132,8 @@ object MangaPlusFilters {
     private class LabelList(
         name: String,
         labels: List<Label>,
-    ) : Filter.Group<Label>(name, labels), Filterable {
+    ) : Filter.Group<Label>(name, labels),
+        Filterable {
         override fun retainMatchingTitles(titles: MutableList<MPAllTitlesGroup>) {
             val included = state.filter { it.state }.map { it.label }
 
@@ -146,12 +149,13 @@ object MangaPlusFilters {
         }
     }
 
-    private class SortFilter(intl: Intl) : Filter.Sort(
-        intl["sort"],
-        arrayOf(
-            intl["sort_title"],
-            intl["sort_latest_update"],
-        ),
-        Selection(1, false),
-    )
+    private class SortFilter(intl: Intl) :
+        Filter.Sort(
+            intl["sort"],
+            arrayOf(
+                intl["sort_title"],
+                intl["sort_latest_update"],
+            ),
+            Selection(1, false),
+        )
 }

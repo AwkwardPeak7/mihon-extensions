@@ -4,44 +4,46 @@ ext {
     extVersionCode = 14
 }
 
-apply from: "$rootDir/common.gradle"
+apply plugin: "kei.plugins.extension.legacy"
 
 dependencies {
     implementation(project(":lib:i18n"))
 }
 
-def securityKeySaltFileName = "src/all/mangaplus/src/io/github/awkwardpeak/extension/all/mangaplus/SecurityKeySalt.kt"
-def securityKeySaltFile = new File(securityKeySaltFileName)
-def backupFile = new File(securityKeySaltFileName + "_bak")
+androidComponents {
+    onVariants(selector().all(), { variant ->
+        def kotlin = variant.sources.kotlin
+        if (kotlin != null) {
+            def variantName = variant.name.capitalize()
 
-tasks.register('updateSecurityKeySalt') {
-    doLast {
-        def salt = System.env.MANGAPLUS_SALT
+            def task = tasks.register("update${variantName}SecurityKeySalt", UpdateSecurityKeySaltTask) {
+		salt.set(providers.environmentVariable("MANGAPLUS_SALT").orNull ?: "sorry_you_should_find_this_yourself")
 
-        println("[MangaPlus] Setting salt to $salt")
-        securityKeySaltFile.renameTo(backupFile)
-        securityKeySaltFile.withPrintWriter {
+                outputs.upToDateWhen { false }
+            }
+
+            kotlin.addGeneratedSourceDirectory(task) { it.outputDir }
+        }
+    })
+}
+
+abstract class UpdateSecurityKeySaltTask extends DefaultTask {
+
+    @Input
+    abstract Property<String> getSalt()
+
+    @OutputDirectory
+    abstract DirectoryProperty getOutputDir()
+
+    @TaskAction
+    void action() {
+        def saltValue = salt.get()
+        def saltFile = outputDir.get().file("SecurityKeySalt.kt").asFile
+        saltFile.parentFile.mkdirs()
+        saltFile.withPrintWriter {
             it.println("// THIS FILE IS AUTO-GENERATED, DO NOT COMMIT")
-            it.println("package io.github.awkwardpeak.extension.all.mangaplus\n\n")
-            it.println("const val SECURITY_KEY_SALT = \"$salt\"")
+            it.println("package io.github.awkwardpeak.extension.all.mangaplus\n")
+            it.println("const val SECURITY_KEY_SALT = \"$saltValue\"")
         }
-    }
-}
-
-preBuild.dependsOn updateSecurityKeySalt
-
-tasks.register('restoreBackup') {
-    doLast {
-        if (backupFile.exists()) {
-            println("[MangaPlus] Restoring placeholder file")
-            securityKeySaltFile.delete()
-            backupFile.renameTo(securityKeySaltFile)
-        }
-    }
-}
-
-tasks.configureEach { task ->
-    if (task.name == "assembleDebug" || task.name == "assembleRelease") {
-        task.finalizedBy(restoreBackup)
     }
 }

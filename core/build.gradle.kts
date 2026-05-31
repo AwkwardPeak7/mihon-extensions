@@ -1,25 +1,26 @@
 plugins {
-    id("com.android.library")
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.serialization)
+
+    alias(kei.plugins.android.base)
+    alias(kei.plugins.spotless)
 }
 
 android {
-    compileSdk = AndroidConfig.compileSdk
-
-    defaultConfig {
-        minSdk = AndroidConfig.minSdk
-    }
-
-    namespace = "io.github.awkwardpeak.core"
-
-    sourceSets {
-        named("main") {
-            manifest.srcFile("AndroidManifest.xml")
-            res.setSrcDirs(listOf("res"))
-        }
-    }
+    namespace = "keiyoushi.core"
 
     buildFeatures {
         resValues = false
-        shaders = false
     }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+}
+
+dependencies {
+    compileOnly(libs.bundles.common)
+
+    testImplementation(libs.bundles.common)
+    testImplementation(libs.junit)
 }

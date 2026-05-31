@@ -74,7 +74,5 @@ object MangaDexMetadataFetcher {
         }
     }
 
-    fun getCover(id: String): String? {
-        return getCovers(listOf(id))[id]
-    }
+    fun getCover(id: String): String? = getCovers(listOf(id))[id]
 }

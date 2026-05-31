@@ -27,14 +27,12 @@ class Manga(
 )
 
 object CoverRelations : JsonTransformingSerializer<List<Relation>>(ListSerializer(Relation.serializer())) {
-    override fun transformDeserialize(element: JsonElement): JsonElement {
-        return JsonArray(
-            element.jsonArray.filter { jsonElement ->
-                val jsonObject = jsonElement.jsonObject
-                jsonObject["type"]?.jsonPrimitive?.content == "cover_art"
-            },
-        )
-    }
+    override fun transformDeserialize(element: JsonElement): JsonElement = JsonArray(
+        element.jsonArray.filter { jsonElement ->
+            val jsonObject = jsonElement.jsonObject
+            jsonObject["type"]?.jsonPrimitive?.content == "cover_art"
+        },
+    )
 }
 
 @Serializable

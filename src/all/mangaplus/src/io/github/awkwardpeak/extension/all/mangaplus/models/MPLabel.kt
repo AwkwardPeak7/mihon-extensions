@@ -40,5 +40,5 @@ enum class MPLabelCode {
     SAIKYOU_JUMP,
     SHOUNEN_JUMP_GIGA,
     ULTRA_JUMP,
-    DX
+    DX,
 }
