@@ -43,6 +43,10 @@ data class MPTitleDetailView(
                 return true
             }
 
+            if (titleLabels.releaseSchedule == MPReleaseSchedule.ONE_SHOT) {
+                return true
+            }
+
             return chapterListV2.first().name.contains("one-shot", false)
         }
 
@@ -128,6 +132,7 @@ enum class MPReleaseSchedule {
     TRIMONTHLY,
     OTHER,
     COMPLETED,
+    ONE_SHOT,
 }
 
 @Serializable

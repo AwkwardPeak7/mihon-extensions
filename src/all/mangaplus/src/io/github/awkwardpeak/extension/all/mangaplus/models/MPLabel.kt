@@ -21,6 +21,7 @@ data class MPLabel(
             MPLabelCode.MANGA_MEE -> "Manga Mee"
             MPLabelCode.ULTRA_JUMP -> "Ultra Jump"
             MPLabelCode.DX -> "Dash X Comic"
+            MPLabelCode.Unknown -> "Unknown"
             else -> null
         }
 }
@@ -41,4 +42,7 @@ enum class MPLabelCode {
     SHOUNEN_JUMP_GIGA,
     ULTRA_JUMP,
     DX,
+
+    @ProtoNumber(-1)
+    Unknown,
 }

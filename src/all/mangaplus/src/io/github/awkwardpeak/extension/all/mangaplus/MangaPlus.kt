@@ -2,6 +2,7 @@ package io.github.awkwardpeak.extension.all.mangaplus
 
 import android.os.Build
 import android.text.InputType
+import android.util.Log
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
@@ -25,6 +26,7 @@ import io.github.awkwardpeak.extension.all.mangaplus.models.MPSuccessResult
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPTitle
 import keiyoushi.lib.i18n.Intl
 import keiyoushi.utils.getPreferencesLazy
+import keiyoushi.utils.parseAsProto
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
 import okhttp3.CacheControl
@@ -466,7 +468,7 @@ class MangaPlus(private val mpLang: MPLanguage) :
 
     @Suppress("ThrowsCount")
     private fun Response.parseAsMpResponse(): MPSuccessResult {
-        val data = ProtoBuf.decodeFromByteArray<MPResponse>(body.bytes())
+        val data = parseAsProto<MPResponse>()
 
         if (data.error != null) {
             if (data.error.action == MPErrorAction.UNAUTHORIZED && request.url.pathSegments.last() == "manga_viewer") {
@@ -519,7 +521,7 @@ private const val PREF_IMAGE_QUALITY = "imageResolution"
 private const val PREF_SPLIT_DOUBLE_PAGES = "splitImage"
 private const val PREF_HIDE_PAID_CHAPTERS = "hidePaidChapters"
 
-private const val APP_VER = "235"
+private const val APP_VER = "250"
 
 private fun ByteArray.toHex(): String = joinToString(separator = "") { eachByte -> "%02x".format(eachByte) }
 
