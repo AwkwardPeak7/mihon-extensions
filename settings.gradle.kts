@@ -28,7 +28,7 @@ dependencyResolutionManagement {
 
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
-rootProject.name = "Keiyoushi"
+rootProject.name = "AwkwardPeak_Extensions"
 
 /**
  * Add or remove modules to load as needed for local development here.
