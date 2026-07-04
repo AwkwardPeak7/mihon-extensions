@@ -1,7 +1,7 @@
 ext {
     extName = 'MANGA Plus by SHUEISHA'
     extClass = '.MangaPlusFactory'
-    extVersionCode = 15
+    extVersionCode = 16
 }
 
 apply plugin: "kei.plugins.extension.legacy"
@@ -17,7 +17,16 @@ androidComponents {
             def variantName = variant.name.capitalize()
 
             def task = tasks.register("update${variantName}SecurityKeySalt", UpdateSecurityKeySaltTask) {
-		salt.set(providers.environmentVariable("MANGAPLUS_SALT").orNull ?: "sorry_you_should_find_this_yourself")
+
+		        salt.set(
+                        providers.environmentVariable("MANGAPLUS_SALT")
+                            .orElse(
+                                providers.fileContents(layout.projectDirectory.file("salt.txt"))
+                                    .asText
+                                    .map { it.trim() }
+                            )
+                            .orNull
+                )
 
                 outputs.upToDateWhen { false }
             }

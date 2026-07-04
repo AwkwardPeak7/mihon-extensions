@@ -5,6 +5,7 @@ import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.interceptor.rateLimit
 import keiyoushi.utils.parseAs
 import okhttp3.CacheControl
+import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -25,6 +26,8 @@ object MangaDexMetadataFetcher {
             ),
         ).execute().parseAs()
     }
+
+    val headers = Headers.headersOf("User-Agent", "OkHttp/5.0.0")
 
     fun getCovers(ids: List<String>): Map<String, String?> {
         var offset = 0
@@ -50,7 +53,7 @@ object MangaDexMetadataFetcher {
                 }
             }.build()
 
-            val response = client.newCall(GET(url)).execute()
+            val response = client.newCall(GET(url, headers)).execute()
                 .parseAs<MangasResponse>()
 
             data += response.data
