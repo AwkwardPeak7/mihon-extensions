@@ -9,7 +9,6 @@ import androidx.preference.PreferenceScreen
 import androidx.preference.SwitchPreferenceCompat
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.asObservableSuccess
-import eu.kanade.tachiyomi.network.interceptor.rateLimitHost
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
@@ -24,7 +23,9 @@ import io.github.awkwardpeak.extension.all.mangaplus.models.MPLanguage
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPResponse
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPSuccessResult
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPTitle
+import keiyoushi.annotation.Source
 import keiyoushi.lib.i18n.Intl
+import keiyoushi.network.rateLimit
 import keiyoushi.utils.getPreferencesLazy
 import keiyoushi.utils.parseAsProto
 import kotlinx.serialization.decodeFromByteArray
@@ -33,6 +34,7 @@ import okhttp3.CacheControl
 import okhttp3.Headers
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -47,21 +49,20 @@ import kotlin.reflect.KProperty
 
 private val API_URL = "https://jumpg-api.tokyo-cdn.com/api".toHttpUrl()
 
-class MangaPlus(private val mpLang: MPLanguage) :
+@Source
+abstract class MangaPlus :
     HttpSource(),
     ConfigurableSource {
 
-    override val name = "MANGA Plus by SHUEISHA"
-
-    override val baseUrl = "https://mangaplus.shueisha.co.jp"
-
-    override val lang = mpLang.lang
+    // name, lang, id and baseUrl are generated per-language from the source { } blocks in
+    // build.gradle.kts; mpLang recovers the language enum from the generated lang.
+    private val mpLang: MPLanguage = enumValues<MPLanguage>().first { it.lang == lang }
 
     override val supportsLatest = true
 
     override val client = network.client.newBuilder()
         .addInterceptor(::authIntercept)
-        .rateLimitHost(API_URL, 1)
+        .rateLimit(1) { it.host == API_URL.host }
         .build()
 
     override fun headersBuilder() = Headers.Builder()
@@ -168,11 +169,26 @@ class MangaPlus(private val mpLang: MPLanguage) :
         return parseDirectory(1)
     }
 
+    // Deeplinks arrive as the raw url via keiyoushi.source.UrlActivity; translate them into the
+    // id:/chapter-id: search prefixes handled below (previously done in MangaPlusUrlActivity).
+    private fun urlToSearchQuery(url: String): String? {
+        val httpUrl = url.toHttpUrlOrNull() ?: return null
+        val segments = httpUrl.pathSegments
+        if (segments.size < 2) return null
+        return when {
+            segments[0] == "viewer" -> PREFIX_CHAPTER_ID_SEARCH + segments[1]
+            segments[1] == "sns_share" -> httpUrl.queryParameter("title_id")?.let { PREFIX_ID_SEARCH + it }
+            else -> PREFIX_ID_SEARCH + segments[1]
+        }
+    }
+
     override fun fetchSearchManga(
         page: Int,
         query: String,
         filters: FilterList,
     ): Observable<MangasPage> {
+        @Suppress("NAME_SHADOWING")
+        val query = urlToSearchQuery(query) ?: query
         return if (page == 1) {
             if (query.startsWith(PREFIX_ID_SEARCH)) {
                 val url = "#/titles/${query.removePrefix(PREFIX_ID_SEARCH)}"

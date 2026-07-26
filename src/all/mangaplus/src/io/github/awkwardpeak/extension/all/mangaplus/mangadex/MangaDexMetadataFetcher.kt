@@ -2,7 +2,7 @@ package io.github.awkwardpeak.extension.all.mangaplus.mangadex
 
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.NetworkHelper
-import eu.kanade.tachiyomi.network.interceptor.rateLimit
+import keiyoushi.network.rateLimit
 import keiyoushi.utils.parseAs
 import okhttp3.CacheControl
 import okhttp3.Headers
@@ -13,7 +13,7 @@ import uy.kohesive.injekt.api.get
 object MangaDexMetadataFetcher {
     private val apiUrl = "https://api.mangadex.org"
 
-    private val client = Injekt.get<NetworkHelper>().cloudflareClient
+    private val client = Injekt.get<NetworkHelper>().client
         .newBuilder()
         .rateLimit(3)
         .build()

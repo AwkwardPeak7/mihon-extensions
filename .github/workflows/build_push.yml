@@ -10,6 +10,7 @@ on:
       - '!.github/**'
       - '.github/scripts/**'
       - '.github/workflows/build_push.yml'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}
@@ -23,28 +24,23 @@ jobs:
       contents: write
     steps:
       - name: Checkout main branch
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           path: main
-          fetch-depth: 0
 
       - name: Set up Java
-        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
         with:
           java-version: 17
           distribution: temurin
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+
       - name: Prepare signing key
         run: |
           echo ${{ secrets.KEYSTORE }} | base64 -d > main/signingkey.jks
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@06832c7b30a0129d7fb559bcc6e43d26f6374244 # v4.3.1
-
-      - name: Grant execute permission for gradlew
-        run: |
-          chmod +x main/gradlew
 
       - name: Build extensions
         env:
@@ -54,38 +50,40 @@ jobs:
           MANGAPLUS_SALT: ${{ secrets.MANGAPLUS_SALT }}
         run: |
           cd main
-          ./gradlew -p src assembleRelease
+          ./gradlew assembleRelease
 
       - name: Clean up CI files
         run: rm main/signingkey.jks
 
-      - name: Create repo artifacts
+      - name: Collect build artifacts
         run: |
+          mkdir -p ~/apk-artifacts
           cd main
-          mkdir -p repo/apk
-          find src -name "*.apk" -exec mv {} repo/apk/ \;
-          INSPECTOR_LINK="$(curl -s "https://api.github.com/repos/keiyoushi/extensions-inspector/releases/latest" | jq -r '.assets[0].browser_download_url')"
-          curl -L "$INSPECTOR_LINK" -o ./Inspector.jar
-          java -jar ./Inspector.jar "repo/apk" "output.json" "tmp"
-          python ./.github/scripts/create-repo.py
+          find . -path '*/build/keiyoushi-source-info.json' | while read -r info; do
+            builddir=$(dirname "$info")
+            dest=~/apk-artifacts/$(echo "$builddir" | tr '/' '_')
+            mkdir -p "$dest"
+            cp "$info" "$dest/"
+            cp -r "$builddir/outputs" "$dest/"
+          done
 
       - name: Checkout repo branch
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: repo
           path: repo
 
-      - name: Commit repo
+      - name: Publish and deploy repo
         run: |
           cd repo
-          rsync -a --delete --exclude .git --exclude .gitignore --exclude repo.json ../main/repo/ .
+          pip install protobuf
+          # Full rebuild: regenerate everything from scratch (repo.json is static, kept).
+          rm -rf apk jar icon index.pb index.min.json
+          python ../main/.github/scripts/publish-repo.py
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
-          git status
-          if [ -n "$(git status --porcelain)" ]; then
-              git add .
-              git commit -m "Update extensions repo"
-              git push
-          else
-              echo "No changes to commit"
-          fi
+          # Force-push a single fresh commit so the repo branch keeps no history.
+          git checkout --orphan fresh-repo
+          git add -A
+          git commit -m "Update extensions repo"
+          git push -f origin fresh-repo:repo
