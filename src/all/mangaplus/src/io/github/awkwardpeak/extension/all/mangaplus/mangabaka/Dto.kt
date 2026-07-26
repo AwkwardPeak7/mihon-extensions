@@ -5,6 +5,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlin.math.roundToInt
 
 // memo key holding the resolved MangaBaka series id for a title.
@@ -67,6 +68,7 @@ class BakaSeries(
     @SerialName("final_volume") private val finalVolume: String? = null,
     @SerialName("content_rating") private val contentRating: String = "safe",
     private val cover: BakaCover? = null,
+    private val source: BakaSource? = null,
     @SerialName("links_v2") private val links: List<BakaLink> = emptyList(),
 ) {
     fun mangaPlusIds(): List<Int> = links.mapNotNull { it.mangaPlusId() }
@@ -123,9 +125,37 @@ class BakaSeries(
             description?.let { append(it) }
             appendSection(null, facts)
             appendSection("Alternative titles", altTitles)
+            appendSection("Trackers", source?.trackerLinks().orEmpty())
             appendSection("Links", linkLines)
         }
     }
+}
+
+@Serializable
+class BakaSource(
+    private val anilist: BakaTracker? = null,
+    @SerialName("my_anime_list") private val myAnimeList: BakaTracker? = null,
+    @SerialName("manga_updates") private val mangaUpdates: BakaTracker? = null,
+    private val kitsu: BakaTracker? = null,
+    @SerialName("anime_planet") private val animePlanet: BakaTracker? = null,
+    private val shikimori: BakaTracker? = null,
+) {
+    fun trackerLinks(): List<String> = buildList {
+        anilist?.value?.let { add("[AniList](https://anilist.co/manga/$it)") }
+        myAnimeList?.value?.let { add("[MyAnimeList](https://myanimelist.net/manga/$it)") }
+        mangaUpdates?.value?.let { add("[MangaUpdates](https://www.mangaupdates.com/series/$it)") }
+        kitsu?.value?.let { add("[Kitsu](https://kitsu.app/manga/$it)") }
+        animePlanet?.value?.let { add("[Anime-Planet](https://www.anime-planet.com/manga/$it)") }
+        shikimori?.value?.let { add("[Shikimori](https://shikimori.one/mangas/$it)") }
+    }
+}
+
+@Serializable
+class BakaTracker(
+    // MangaBaka ids are numeric for some trackers and slugs for others, so keep the raw primitive.
+    private val id: JsonPrimitive? = null,
+) {
+    val value: String? get() = id?.contentOrNull
 }
 
 private fun StringBuilder.appendSection(header: String?, lines: List<String>) {
