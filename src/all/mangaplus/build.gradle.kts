@@ -7,15 +7,14 @@ plugins {
 
 keiyoushi {
     name = "MANGA Plus by SHUEISHA"
-    versionCode = 17
+    versionCode = 18
     contentWarning = ContentWarning.SAFE
-    libVersion = "1.4"
+    libVersion = "1.6"
 
-    listOf("en", "es", "fr", "id", "pt-BR", "ru", "th", "de", "vi").forEach {
-        source {
-            lang = it
-            baseUrl = "https://mangaplus.shueisha.co.jp"
-        }
+    // English only: metadata comes from MangaBaka, which is primarily English.
+    source {
+        lang = "en"
+        baseUrl = "https://mangaplus.shueisha.co.jp"
     }
 
     deeplink {
@@ -27,10 +26,6 @@ keiyoushi {
         path("/viewer/..*")
         path("/www/sns_share")
     }
-}
-
-dependencies {
-    implementation(project(":lib:i18n"))
 }
 
 // Injects the security key salt (from the MANGAPLUS_SALT env var, falling back to salt.txt) into a

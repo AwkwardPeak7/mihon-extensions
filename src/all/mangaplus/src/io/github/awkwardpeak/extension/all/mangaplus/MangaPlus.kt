@@ -2,148 +2,118 @@ package io.github.awkwardpeak.extension.all.mangaplus
 
 import android.os.Build
 import android.text.InputType
-import android.util.Log
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
 import androidx.preference.SwitchPreferenceCompat
-import eu.kanade.tachiyomi.network.GET
-import eu.kanade.tachiyomi.network.asObservableSuccess
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
-import eu.kanade.tachiyomi.source.online.HttpSource
-import io.github.awkwardpeak.extension.all.mangaplus.mangadex.MangaDexMetadataFetcher
+import eu.kanade.tachiyomi.source.model.SMangaUpdate
+import io.github.awkwardpeak.extension.all.mangaplus.mangabaka.BAKA_MEMO_KEY
+import io.github.awkwardpeak.extension.all.mangaplus.mangabaka.BakaSearchResponse
+import io.github.awkwardpeak.extension.all.mangaplus.mangabaka.BakaSeries
+import io.github.awkwardpeak.extension.all.mangaplus.mangabaka.MangaBakaFilters
+import io.github.awkwardpeak.extension.all.mangaplus.mangabaka.MangaBakaMetadataFetcher
 import io.github.awkwardpeak.extension.all.mangaplus.models.ChapterType
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPErrorAction
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPLanguage
+import io.github.awkwardpeak.extension.all.mangaplus.models.MPMangaViewer
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPResponse
 import io.github.awkwardpeak.extension.all.mangaplus.models.MPSuccessResult
-import io.github.awkwardpeak.extension.all.mangaplus.models.MPTitle
+import io.github.awkwardpeak.extension.all.mangaplus.models.MPTitleDetailView
 import keiyoushi.annotation.Source
-import keiyoushi.lib.i18n.Intl
+import keiyoushi.network.get
 import keiyoushi.network.rateLimit
+import keiyoushi.source.KeiSource
+import keiyoushi.utils.getPreferences
 import keiyoushi.utils.getPreferencesLazy
 import keiyoushi.utils.parseAsProto
-import kotlinx.serialization.decodeFromByteArray
-import kotlinx.serialization.protobuf.ProtoBuf
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import okhttp3.CacheControl
 import okhttp3.Headers
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
+import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
-import rx.Observable
 import java.io.IOException
 import java.security.MessageDigest
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
+import kotlin.enums.enumEntries
 import kotlin.random.Random
-import kotlin.reflect.KProperty
 
 private val API_URL = "https://jumpg-api.tokyo-cdn.com/api".toHttpUrl()
 
 @Source
 abstract class MangaPlus :
-    HttpSource(),
+    KeiSource(),
     ConfigurableSource {
 
-    // name, lang, id and baseUrl are generated per-language from the source { } blocks in
-    // build.gradle.kts; mpLang recovers the language enum from the generated lang.
-    private val mpLang: MPLanguage = enumValues<MPLanguage>().first { it.lang == lang }
+    private val mpLang: MPLanguage = enumEntries<MPLanguage>().first { it.lang == lang }
 
-    override val supportsLatest = true
+    private val internalLang get() = mpLang.internalLang
 
-    override val client = network.client.newBuilder()
-        .addInterceptor(::authIntercept)
-        .rateLimit(1) { it.host == API_URL.host }
-        .build()
+    private val preferences = getPreferences()
 
-    override fun headersBuilder() = Headers.Builder()
-        .set("User-Agent", "okhttp/4.9.0")
-
-    private val internalLang = mpLang.internalLang
-
-    private val preferences by getPreferencesLazy()
-
-    private val intl = Intl(
-        lang,
-        setOf("en", "pt-BR", "vi"),
-        "en",
-        this::class.java.classLoader!!,
-    )
-
-    /**
-     * Private cache to find the newest thumbnail URL in case the existing one
-     * in Tachiyomi database is expired. It's also used during the chapter deeplink
-     * handling to avoid an additional request if possible.
-     */
-    private var titleCache: Map<Int, MPTitle>? = null
-
-    override fun fetchPopularManga(page: Int): Observable<MangasPage> = if (page == 1) {
-        client.newCall(popularMangaRequest(page))
-            .asObservableSuccess()
-            .map { popularMangaParse(it) }
-    } else {
-        Observable.just(parseDirectory(page))
+    override fun OkHttpClient.Builder.configureClient() = apply {
+        addInterceptor(::authIntercept)
+        rateLimit(1) { it.host == API_URL.host }
     }
 
-    override fun popularMangaRequest(page: Int): Request {
-        val url = API_URL.newBuilder()
-            .addPathSegments("title_list/search")
-            .addQueryParameter("lang", internalLang)
-            .addQueryParameter("clang", internalLang)
-            .addCommonQueryParameters()
-            .build()
-
-        return GET(url, headers)
+    override fun Headers.Builder.configureHeaders() = apply {
+        set("User-Agent", "okhttp/4.9.0")
+        removeAll("Referer")
+        removeAll("Origin")
     }
 
-    override fun popularMangaParse(response: Response): MangasPage {
-        val data = response.parseAsMpResponse()
+    private suspend fun BakaSearchResponse.toMangasPage(): MangasPage {
+        val langIds = langIds()
+        val entries = data.mapNotNull { it.toSMangaOrNull(langIds) }
 
-        titleCache = data.searchView!!.allTitlesGroup
-            .flatMap { it.titles }
-            .filter { it.language == mpLang }
-            .associateBy { it.titleId }
-
-        return parseDirectory(1)
+        return MangasPage(entries, hasNextPage = pagination.next != null)
     }
 
-    private fun parseDirectory(page: Int): MangasPage {
-        val directory = titleCache!!.values
-        val manga = directory.drop((page - 1) * 24).take(24)
+    private fun BakaSeries.toSMangaOrNull(langIds: Set<Int>): SManga? {
+        val mangaPlusId = mangaPlusIds().firstOrNull { it in langIds } ?: return null
 
-        val covers = MangaDexMetadataFetcher.getCovers(
-            manga.map { it.titleId.toString() },
+        return toSManga(mangaPlusId, lang)
+    }
+
+    // Popular
+
+    override suspend fun getPopularManga(page: Int): MangasPage = MangaBakaMetadataFetcher.search(query = null, page = page, params = listOf("sort_by" to "popularity_asc"))
+        .toMangasPage()
+
+    // Latest
+
+    override suspend fun getLatestUpdates(page: Int): MangasPage = coroutineScope {
+        if (page > 1) return@coroutineScope MangasPage(emptyList(), false)
+
+        val orderedDeferred = async { latestMangaPlusIds() }
+        val catalogDeferred = async { MangaBakaMetadataFetcher.allByMangaPlusId() }
+
+        val ordered = orderedDeferred.await()
+        val catalog = catalogDeferred.await()
+
+        MangasPage(
+            ordered.mapNotNull { catalog[it]?.toSManga(it, lang) },
+            hasNextPage = false,
         )
-
-        val entries = manga.map {
-            it.toSManga().apply {
-                thumbnail_url = covers[it.titleId.toString()] ?: thumbnail_url
-            }
-        }
-
-        val hasNextPage = (page + 1) * 24 < titleCache!!.size
-
-        return MangasPage(entries, hasNextPage)
     }
 
-    override fun fetchLatestUpdates(page: Int): Observable<MangasPage> = if (page == 1) {
-        client.newCall(latestUpdatesRequest(page))
-            .asObservableSuccess()
-            .map { latestUpdatesParse(it) }
-    } else {
-        Observable.just(parseDirectory(page))
-    }
-
-    override fun latestUpdatesRequest(page: Int): Request {
+    private suspend fun latestMangaPlusIds(): List<Int> {
         val url = API_URL.newBuilder()
             .addPathSegment("home_v4")
             .addQueryParameter("lang", internalLang)
@@ -151,138 +121,160 @@ abstract class MangaPlus :
             .addCommonQueryParameters()
             .build()
 
-        return GET(url, headers)
-    }
+        val data = client.get(url, headers).parseAsMpResponse()
 
-    override fun latestUpdatesParse(response: Response): MangasPage {
-        val data = response.parseAsMpResponse()
+        setSubscriptionReading(data.homeViewV3!!.userSubscription.planType != "basic")
 
-        subscriptionReading = data.homeViewV3!!.userSubscription.planType != "basic"
-        titleCache = data.homeViewV3.groups
-            .flatMap {
-                it.titleGroups
-                    .flatMap { g -> g.titles.map { t -> t.title } }
-            }
+        return data.homeViewV3.groups
+            .flatMap { it.titleGroups.flatMap { g -> g.titles.map { t -> t.title } } }
             .filter { it.language == mpLang }
-            .associateBy { it.titleId }
-
-        return parseDirectory(1)
+            .map { it.titleId }
+            .distinct()
     }
 
-    // Deeplinks arrive as the raw url via keiyoushi.source.UrlActivity; translate them into the
-    // id:/chapter-id: search prefixes handled below (previously done in MangaPlusUrlActivity).
-    private fun urlToSearchQuery(url: String): String? {
-        val httpUrl = url.toHttpUrlOrNull() ?: return null
-        val segments = httpUrl.pathSegments
-        if (segments.size < 2) return null
-        return when {
-            segments[0] == "viewer" -> PREFIX_CHAPTER_ID_SEARCH + segments[1]
-            segments[1] == "sns_share" -> httpUrl.queryParameter("title_id")?.let { PREFIX_ID_SEARCH + it }
-            else -> PREFIX_ID_SEARCH + segments[1]
+    // Search
+
+    override suspend fun getSearchMangaList(page: Int, query: String, filters: FilterList): MangasPage {
+        if (query.startsWith(PREFIX_ID_SEARCH)) {
+            return MangasPage(listOf(getMangaByMangaPlusId(query.removePrefix(PREFIX_ID_SEARCH))), false)
+        }
+        if (query.startsWith(PREFIX_CHAPTER_ID_SEARCH)) {
+            val titleId = mangaViewer(query.removePrefix(PREFIX_CHAPTER_ID_SEARCH)).titleId
+            return MangasPage(listOf(getMangaByMangaPlusId(titleId.toString())), false)
+        }
+
+        return MangaBakaMetadataFetcher.search(query = query, page = page, params = MangaBakaFilters.toQueryParams(filters))
+            .toMangasPage()
+    }
+
+    // Filters
+
+    override val supportsFilterFetching get() = true
+
+    override suspend fun fetchFilterData(): JsonElement = MangaBakaMetadataFetcher.fetchGenres()
+
+    override fun getFilterList(data: JsonElement?): FilterList = MangaBakaFilters.getFilterList(data)
+
+    // Related
+
+    override val supportsRelatedMangas get() = true
+
+    override suspend fun fetchRelatedMangaList(manga: SManga): List<SManga> {
+        val mangaPlusId = manga.url.substringAfterLast("/").toIntOrNull() ?: return emptyList()
+        val bakaId = manga.bakaId
+            ?: MangaBakaMetadataFetcher.seriesByMangaPlusId(mangaPlusId, manga.title)?.id
+            ?: return emptyList()
+
+        val langIds = langIds()
+
+        return MangaBakaMetadataFetcher.similar(bakaId).mapNotNull { it.toSMangaOrNull(langIds) }
+    }
+
+    private var languageIds: Set<Int>? = null
+    private val languageIdsMutex = Mutex()
+
+    private suspend fun langIds(): Set<Int> {
+        languageIds?.let { return it }
+
+        return languageIdsMutex.withLock {
+            languageIds ?: fetchLangIds().also { languageIds = it }
         }
     }
 
-    override fun fetchSearchManga(
-        page: Int,
-        query: String,
-        filters: FilterList,
-    ): Observable<MangasPage> {
-        @Suppress("NAME_SHADOWING")
-        val query = urlToSearchQuery(query) ?: query
-        return if (page == 1) {
-            if (query.startsWith(PREFIX_ID_SEARCH)) {
-                val url = "#/titles/${query.removePrefix(PREFIX_ID_SEARCH)}"
+    private suspend fun fetchLangIds(): Set<Int> {
+        val url = API_URL.newBuilder()
+            .addPathSegments("title_list/search")
+            .addQueryParameter("lang", internalLang)
+            .addQueryParameter("clang", internalLang)
+            .addCommonQueryParameters()
+            .build()
 
-                return client.newCall(mangaDetailsRequest(SManga.create().apply { this.url = url }))
-                    .asObservableSuccess()
-                    .map { MangasPage(listOf(mangaDetailsParse(it)), false) }
-            } else if (query.startsWith(PREFIX_CHAPTER_ID_SEARCH)) {
-                val url = "#/viewer/${query.removePrefix(PREFIX_CHAPTER_ID_SEARCH)}"
+        val data = client.get(url, headers).parseAsMpResponse()
 
-                return client.newCall(pageListRequest(SChapter.create().apply { this.url = url }))
-                    .asObservableSuccess()
-                    .map {
-                        val data = it.parseAsMpResponse()
-                        val titleId = data.mangaViewer!!.titleId
-                        val title = titleCache?.get(titleId)?.toSManga() ?: run {
-                            val mangaUrl = "#/titles/$titleId"
-
-                            client.newCall(mangaDetailsRequest(SManga.create().apply { this.url = mangaUrl }))
-                                .execute()
-                                .let { r -> mangaDetailsParse(r) }
-                        }
-
-                        MangasPage(listOf(title), false)
-                    }
-            }
-
-            client.newCall(searchMangaRequest(page, query, filters))
-                .asObservableSuccess()
-                .map { searchMangaParse(it, query, filters) }
-        } else {
-            Observable.just(parseDirectory(page))
-        }
+        return data.searchView!!.allTitlesGroup
+            .flatMap { it.titles }
+            .filter { it.language == mpLang }
+            .map { it.titleId }
+            .toSet()
     }
 
-    override fun searchMangaRequest(page: Int, query: String, filters: FilterList) = popularMangaRequest(page)
+    override suspend fun getMangaByUrl(url: HttpUrl): SManga? {
+        val segments = url.pathSegments
+        val mangaPlusId = when {
+            segments.getOrNull(0) == "viewer" -> segments.getOrNull(1)?.let { mangaViewer(it).titleId.toString() }
+            segments.getOrNull(1) == "sns_share" -> url.queryParameter("title_id")
+            segments.size >= 2 -> segments[1]
+            else -> null
+        } ?: return null
 
-    override fun searchMangaParse(response: Response) = throw UnsupportedOperationException()
+        return getMangaByMangaPlusId(mangaPlusId)
+    }
 
-    private fun searchMangaParse(response: Response, query: String, filters: FilterList): MangasPage {
-        val data = response.parseAsMpResponse()
+    // Details & Chapters
 
-        titleCache = MangaPlusFilters.filterMangaList(
-            data.searchView!!.allTitlesGroup,
-            mpLang,
-            query,
-            filters,
+    override suspend fun fetchMangaUpdate(
+        manga: SManga,
+        chapters: List<SChapter>,
+        fetchDetails: Boolean,
+        fetchChapters: Boolean,
+    ): SMangaUpdate = coroutineScope {
+        val mangaPlusId = manga.url.substringAfterLast("/")
+
+        val viewDeferred = async { getTitleDetail(mangaPlusId) }
+        val bakaByIdDeferred = manga.bakaId?.let { id -> async { MangaBakaMetadataFetcher.getSeries(id) } }
+
+        val view = viewDeferred.await()
+        val baka = bakaByIdDeferred?.await()
+            ?: MangaBakaMetadataFetcher.seriesByMangaPlusId(mangaPlusId.toInt(), view.title.name)
+
+        SMangaUpdate(
+            manga = baka?.toDetailedSManga(mangaPlusId.toInt(), view) ?: view.toSManga(),
+            chapters = view.toChapters(),
         )
-            .associateBy { it.titleId }
-
-        return parseDirectory(1)
     }
 
-    override fun getMangaUrl(manga: SManga) = baseUrl + manga.url.substring(1)
+    private suspend fun getMangaByMangaPlusId(mangaPlusId: String): SManga {
+        val view = getTitleDetail(mangaPlusId)
+        val id = mangaPlusId.toIntOrNull()
 
-    override fun mangaDetailsRequest(manga: SManga): Request {
+        return id?.let { MangaBakaMetadataFetcher.seriesByMangaPlusId(it, view.title.name)?.toDetailedSManga(it, view) }
+            ?: view.toSManga()
+    }
+
+    private suspend fun BakaSeries.toDetailedSManga(mangaPlusId: Int, view: MPTitleDetailView): SManga = toSManga(mangaPlusId, lang, MangaBakaMetadataFetcher.latestVolumeCover(id), view.extraInfo)
+
+    private val SManga.bakaId: Int?
+        get() = (memo[BAKA_MEMO_KEY] as? JsonPrimitive)?.content?.toIntOrNull()
+
+    private suspend fun getTitleDetail(titleId: String): MPTitleDetailView {
         val url = API_URL.newBuilder()
             .addPathSegment("title_detailV3")
-            .addQueryParameter("title_id", manga.url.substringAfterLast("/"))
+            .addQueryParameter("title_id", titleId)
             .addQueryParameter("lang", internalLang)
             .addCommonQueryParameters()
             .build()
 
-        return GET(url, headers)
-    }
+        val view = client.get(url, headers).parseAsMpResponse().titleDetailView!!
 
-    override fun mangaDetailsParse(response: Response): SManga {
-        val titleId = response.request.url.queryParameter("title_id")!!
-        val titleDetailView = response.parseAsMpResponse().titleDetailView!!
-
-        if (titleDetailView.title.language != mpLang) {
-            throw Exception(intl["not_available"])
+        if (view.title.language != mpLang) {
+            throw Exception("Title not available in this language.")
         }
 
-        subscriptionReading = titleDetailView.userSubscription.planType != "basic"
+        setSubscriptionReading(view.userSubscription.planType != "basic")
 
-        return titleDetailView.toSManga(intl).apply {
-            thumbnail_url = MangaDexMetadataFetcher.getCover(titleId) ?: thumbnail_url
-        }
+        return view
     }
 
-    override fun chapterListRequest(manga: SManga) = mangaDetailsRequest(manga)
-
-    override fun chapterListParse(response: Response): List<SChapter> {
-        val data = response.parseAsMpResponse().titleDetailView!!
+    private fun MPTitleDetailView.toChapters(): List<SChapter> {
         val hidePaidChapters = preferences.getBoolean(PREF_HIDE_PAID_CHAPTERS, false)
         val chapters = if (
             hidePaidChapters &&
-            data.titleLabels.planType == "deluxe" &&
-            data.userSubscription.planType != "deluxe"
+            titleLabels.planType == "deluxe" &&
+            userSubscription.planType != "deluxe"
         ) {
-            data.chapterListV2.filter { it.chapterType != ChapterType.DELUX }
+            chapterListV2.filter { it.chapterType != ChapterType.DELUX }
         } else {
-            data.chapterListV2
+            chapterListV2
         }
             .map { it.toSChapter() }
 
@@ -310,7 +302,7 @@ abstract class MangaPlus :
                 .forEach { t.insert(it.name) }
             t.longestPrefix()
         }
-            .ifEmpty { intl["chapter"] }
+            .ifEmpty { "Chapter" }
 
         for (i in chapters.indices) {
             val chapter = chapters[i]
@@ -331,40 +323,27 @@ abstract class MangaPlus :
         return chapters.reversed()
     }
 
+    override fun getMangaUrl(manga: SManga) = baseUrl + manga.url.substring(1)
+
     override fun getChapterUrl(chapter: SChapter) = baseUrl + chapter.url.substring(1)
 
-    private var subscriptionReading by object {
-        private var inner: Boolean? = null
+    // Pages
 
-        operator fun setValue(thisRef: MangaPlus, property: KProperty<*>, value: Boolean) {
-            if (inner == null) {
-                inner = value
+    override suspend fun getPageList(chapter: SChapter): List<Page> {
+        val chapterId = chapter.url.substringAfterLast("/")
+
+        return mangaViewer(chapterId).pages
+            .mapNotNull { it.mangaPage }
+            .mapIndexed { i, page ->
+                Page(i, imageUrl = page.imageUrl)
             }
-        }
-
-        operator fun getValue(thisRef: MangaPlus, property: KProperty<*>): Boolean {
-            if (inner == null) {
-                val url = API_URL.newBuilder()
-                    .addPathSegment("settings_v2")
-                    .addQueryParameter("lang", internalLang)
-                    .addQueryParameter("viewer_mode", "horizontal")
-                    .addQueryParameter("clang", internalLang)
-                    .addCommonQueryParameters()
-                    .build()
-
-                val data = client.newCall(GET(url, headers)).execute().parseAsMpResponse()
-
-                inner = data.settingsViewV2!!.userSubscription.planType != "basic"
-            }
-
-            return inner!!
-        }
     }
 
-    override fun pageListRequest(chapter: SChapter): Request {
+    private suspend fun mangaViewer(chapterId: String): MPMangaViewer {
+        val subscriptionReading = isSubscriptionReading()
         val url = API_URL.newBuilder()
             .addPathSegment("manga_viewer")
-            .addQueryParameter("chapter_id", chapter.url.substringAfterLast("/"))
+            .addQueryParameter("chapter_id", chapterId)
             .addQueryParameter(
                 "split",
                 if (preferences.getBoolean("${PREF_SPLIT_DOUBLE_PAGES}_$lang", false)) {
@@ -384,33 +363,17 @@ abstract class MangaPlus :
             .addCommonQueryParameters()
             .build()
 
-        return GET(url, headers, CacheControl.FORCE_NETWORK)
+        return client.get(url, headers, CacheControl.FORCE_NETWORK).parseAsMpResponse().mangaViewer!!
     }
 
-    override fun pageListParse(response: Response): List<Page> {
-        val data = response.parseAsMpResponse()
-
-        return data.mangaViewer!!.pages
-            .mapNotNull { it.mangaPage }
-            .mapIndexed { i, page ->
-                Page(i, imageUrl = page.imageUrl)
-            }
-    }
-
-    override fun imageUrlParse(response: Response) = throw UnsupportedOperationException()
-
-    override fun getFilterList() = MangaPlusFilters.getFilterList(intl)
+    // Preferences
 
     override fun setupPreferenceScreen(screen: PreferenceScreen) {
         ListPreference(screen.context).apply {
             key = "${PREF_IMAGE_QUALITY}_$lang"
-            title = intl["image_quality"]
+            title = "Image quality"
             summary = "%s"
-            entries = arrayOf(
-                intl["image_quality_low"],
-                intl["image_quality_medium"],
-                intl["image_quality_high"],
-            )
+            entries = arrayOf("Low", "Medium", "High")
             entryValues = arrayOf("low", "high", "super_high")
 
             setDefaultValue("high")
@@ -418,28 +381,58 @@ abstract class MangaPlus :
 
         SwitchPreferenceCompat(screen.context).apply {
             key = "${PREF_SPLIT_DOUBLE_PAGES}_$lang"
-            title = intl["split_double_pages"]
-            summary = intl["split_double_pages_summary"]
+            title = "Split double pages"
+            summary = "Only a few titles supports disabling this setting."
             setDefaultValue(true)
         }.also(screen::addPreference)
 
         SwitchPreferenceCompat(screen.context).apply {
             key = PREF_HIDE_PAID_CHAPTERS
-            title = intl["hide_paid_chapters"]
-            summary = intl["hide_paid_chapters_summary"]
-            setDefaultValue(false)
+            title = "Hide paid chapters"
+            summary = "Don't show chapters that require a MANGA Plus MAX Deluxe subscription."
+            setDefaultValue(true)
         }.also(screen::addPreference)
 
         EditTextPreference(screen.context).apply {
             key = PREF_SECRET
-            title = intl["access_token"]
-            summary = intl["access_token_summary"]
+            title = "Access token"
+            summary = "A valid access token is required to access the service. " +
+                "Leave empty to let the extension generate one."
 
             setOnBindEditTextListener {
                 it.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             }
         }.also(screen::addPreference)
     }
+
+    // Subscription state
+
+    private var subscriptionReading: Boolean? = null
+
+    private fun setSubscriptionReading(value: Boolean) {
+        if (subscriptionReading == null) {
+            subscriptionReading = value
+        }
+    }
+
+    private suspend fun isSubscriptionReading(): Boolean {
+        subscriptionReading?.let { return it }
+
+        val url = API_URL.newBuilder()
+            .addPathSegment("settings_v2")
+            .addQueryParameter("lang", internalLang)
+            .addQueryParameter("viewer_mode", "horizontal")
+            .addQueryParameter("clang", internalLang)
+            .addCommonQueryParameters()
+            .build()
+
+        val data = client.get(url, headers).parseAsMpResponse()
+
+        return (data.settingsViewV2!!.userSubscription.planType != "basic")
+            .also { subscriptionReading = it }
+    }
+
+    // Auth
 
     private fun authIntercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
@@ -482,26 +475,27 @@ abstract class MangaPlus :
         return chain.proceed(newRequest)
     }
 
-    @Suppress("ThrowsCount")
+    // Utilities
+
     private fun Response.parseAsMpResponse(): MPSuccessResult {
         val data = parseAsProto<MPResponse>()
 
         if (data.error != null) {
             if (data.error.action == MPErrorAction.UNAUTHORIZED && request.url.pathSegments.last() == "manga_viewer") {
-                throw Exception(intl["chapter_locked"])
+                throw Exception("This chapter can only be accessed by subscribing for MANGA Plus MAX Deluxe.")
             }
 
             val popup = data.error.popups.find { it.language == mpLang }
                 ?: data.error.englishPopup
 
             if (popup.subject == "Not Found" && request.url.pathSegments.last() == "title_detailV3") {
-                throw IOException(intl["title_removed"])
+                throw IOException("This title was removed from the MANGA Plus catalogue.")
             }
 
-            throw IOException("${popup.subject}: ${popup.body.ifEmpty { intl["unknown_error"] }}")
+            throw IOException("${popup.subject}: ${popup.body.ifEmpty { "An unknown error happened." }}")
         }
 
-        check(data.success != null) { intl["unknown_error"] }
+        check(data.success != null) { "An unknown error happened." }
 
         return data.success
     }
@@ -537,14 +531,13 @@ private const val PREF_IMAGE_QUALITY = "imageResolution"
 private const val PREF_SPLIT_DOUBLE_PAGES = "splitImage"
 private const val PREF_HIDE_PAID_CHAPTERS = "hidePaidChapters"
 
-private const val APP_VER = "250"
+// MANGA Plus app's versionCode
+private const val APP_VER = "261"
 
-private fun ByteArray.toHex(): String = joinToString(separator = "") { eachByte -> "%02x".format(eachByte) }
-
-fun generateDeviceToken() = Random.nextBytes(DEVICE_TOKEN_BYTES).toHex()
+fun generateDeviceToken() = Random.nextBytes(DEVICE_TOKEN_BYTES).toHexString()
 
 fun calculateSecurityKey(deviceToken: String): String {
     val md5 = MessageDigest.getInstance("MD5")
 
-    return md5.digest("${deviceToken}$SECURITY_KEY_SALT".encodeToByteArray()).toHex()
+    return md5.digest("${deviceToken}$SECURITY_KEY_SALT".encodeToByteArray()).toHexString()
 }

@@ -2,7 +2,6 @@ package io.github.awkwardpeak.extension.all.mangaplus.models
 
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
-import keiyoushi.lib.i18n.Intl
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoNumber
 
@@ -64,7 +63,7 @@ data class MPTitleDetailView(
     private val isOnHiatus: Boolean
         get() = nonAppearanceInfo.contains(HIATUS_REGEX)
 
-    private fun createGenres(intl: Intl): List<String> = buildList {
+    private fun createGenres(): List<String> = buildList {
         val isReleasingNewChapters = !isReEdition && !isOneShot && !isCompleted
 
         if (isSimulpub && isReleasingNewChapters) {
@@ -84,16 +83,14 @@ data class MPTitleDetailView(
         }
 
         if (label?.magazine != null) {
-            add(intl.format("serialization", label.magazine))
+            add("Serialization: ${label.magazine}")
         }
 
         if (!isCompleted) {
-            val scheduleLabel = intl["schedule_" + titleLabels.releaseSchedule.toString().lowercase()]
-            add(intl.format("schedule", scheduleLabel))
+            add("Schedule: ${titleLabels.releaseSchedule.displayName}")
         }
 
-        val ratingLabel = intl["rating_" + rating.toString().lowercase()]
-        add(intl.format("rating", ratingLabel))
+        add("Rating: ${rating.displayName}")
 
         if (titleLabels.planType == "deluxe") {
             add("MANGA Plus MAX Deluxe")
@@ -103,9 +100,20 @@ data class MPTitleDetailView(
     private val viewingDescription: String?
         get() = viewingPeriodDescription.takeIf { titleLabels.planType == "deluxe" }
 
-    fun toSManga(intl: Intl) = title.toSManga().apply {
+    // MANGA Plus-specific facts not surfaced by MangaBaka, appended to the description.
+    val extraInfo: List<String> get() = buildList {
+        label?.magazine?.let { add("Serialization: $it") }
+        if (isSimulpub && !isCompleted) add("Simulrelease")
+        if (isWebtoon) add("Webtoon")
+        if (!isCompleted && titleLabels.releaseSchedule.displayName.isNotEmpty()) {
+            add("Release: ${titleLabels.releaseSchedule.displayName}")
+        }
+        if (titleLabels.planType == "deluxe") add("MANGA Plus MAX Deluxe")
+    }
+
+    fun toSManga() = title.toSManga().apply {
         description = "${overview}\n\n${viewingDescription.orEmpty()}".trim()
-        genre = createGenres(intl).joinToString()
+        genre = createGenres().joinToString()
         status = when {
             isCompleted -> SManga.COMPLETED
             isOnHiatus -> SManga.ON_HIATUS
@@ -122,25 +130,25 @@ data class MPTitleLabels(
 )
 
 @Serializable
-enum class MPReleaseSchedule {
-    DISABLED,
-    EVERYDAY,
-    WEEKLY,
-    BIWEEKLY,
-    MONTHLY,
-    BIMONTHLY,
-    TRIMONTHLY,
-    OTHER,
-    COMPLETED,
-    ONE_SHOT,
+enum class MPReleaseSchedule(val displayName: String) {
+    DISABLED(""),
+    EVERYDAY("Everyday"),
+    WEEKLY("Weekly"),
+    BIWEEKLY("Biweekly"),
+    MONTHLY("Monthly"),
+    BIMONTHLY("Bimonthly"),
+    TRIMONTHLY("Trimonthly"),
+    OTHER("Other"),
+    COMPLETED("Completed"),
+    ONE_SHOT("One-shot"),
 }
 
 @Serializable
-enum class MPContentRating {
-    ALL_AGES,
-    TEEN,
-    TEEN_PLUS,
-    MATURE,
+enum class MPContentRating(val displayName: String) {
+    ALL_AGES("All ages"),
+    TEEN("Teen"),
+    TEEN_PLUS("Teen Plus"),
+    MATURE("Mature"),
 }
 
 @Serializable
