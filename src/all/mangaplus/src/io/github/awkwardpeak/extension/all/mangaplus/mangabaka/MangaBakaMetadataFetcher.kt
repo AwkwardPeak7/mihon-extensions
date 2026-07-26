@@ -77,7 +77,7 @@ object MangaBakaMetadataFetcher {
         }
     }
 
-    suspend fun latestVolumeCover(id: Int): String? = client.get("$SERIES_URL/$id/images", headers, ensureSuccess = false).let { response ->
+    suspend fun latestVolumeCover(id: Int): String? = client.get("$SERIES_URL/$id/images?limit=50&language=ja&type=volume", headers, ensureSuccess = false).let { response ->
         if (!response.isSuccessful) {
             response.close()
             null
