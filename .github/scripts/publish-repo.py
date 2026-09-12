@@ -3,6 +3,7 @@ import hashlib
 import html
 import json
 import math
+import shutil
 import subprocess
 import sys
 import time
@@ -19,6 +20,9 @@ ARTIFACTS_DIR = Path.home() / "apk-artifacts"
 
 # The checked-out `repo` branch we publish into (the working directory).
 REPO_DIR = Path.cwd()
+
+# Files from the pre-release publishing scheme; replaced by index.json + releases.
+LEGACY_PATHS = ["index.min.json", "apk", "jar", "icon"]
 
 ICON_BASE_URL = "https://cdn.jsdelivr.net/gh/AwkwardPeak7/mihon-extensions@main"
 RELEASE_BASE_URL = f"https://github.com/{REPO_NAME}/releases/download"
@@ -38,8 +42,14 @@ PURGE_URLS = [
 current_sha = sys.argv[1]
 current_sha_short = current_sha[:7]
 
-with REPO_DIR.joinpath("index.json").open() as f:
-    remote_proto = json_format.Parse(f.read(), index_pb2.Index())
+index_path = REPO_DIR / "index.json"
+if index_path.exists():
+    with index_path.open() as f:
+        remote_proto = json_format.Parse(f.read(), index_pb2.Index())
+else:
+    # First run after migrating from the legacy scheme: start from an empty index; every
+    # built extension is new and gets a release of its own.
+    remote_proto = index_pb2.Index()
 
 remote_extensions = {
     ext.packageName: ext for ext in remote_proto.extensionList.extensions
@@ -193,7 +203,7 @@ index = index_pb2.Index(
     extensionList=index_pb2.ExtensionList(extensions=final_extensions),
 )
 
-with REPO_DIR.joinpath("index.json").open("w", encoding="utf-8") as f:
+with index_path.open("w", encoding="utf-8") as f:
     f.write(
         json_format.MessageToJson(
             index,
@@ -333,6 +343,13 @@ def run_git(*args: str) -> str:
 
 
 def push_repo() -> None:
+    for legacy in LEGACY_PATHS:
+        path = REPO_DIR / legacy
+        if path.is_dir():
+            shutil.rmtree(path)
+        elif path.exists():
+            path.unlink()
+
     run_git("add", "-A")
     if not run_git("status", "--porcelain"):
         print("No changes to commit")
