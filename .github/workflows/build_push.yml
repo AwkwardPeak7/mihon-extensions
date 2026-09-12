@@ -12,6 +12,8 @@ on:
       - '.github/workflows/build_push.yml'
   workflow_dispatch:
 
+permissions: {}
+
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
@@ -20,6 +22,7 @@ jobs:
   build:
     name: Build and Publish
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     permissions:
       contents: write
     steps:
@@ -30,13 +33,13 @@ jobs:
           path: main
 
       - name: Set up Java
-        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
         with:
           java-version: 17
           distribution: temurin
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5.0.2
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
 
       - name: Prepare signing key
         run: |
@@ -74,16 +77,9 @@ jobs:
           path: repo
 
       - name: Publish and deploy repo
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           cd repo
           pip install protobuf
-          # Full rebuild: regenerate everything from scratch (repo.json is static, kept).
-          rm -rf apk jar icon index.pb index.min.json
-          python ../main/.github/scripts/publish-repo.py
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
-          # Force-push a single fresh commit so the repo branch keeps no history.
-          git checkout --orphan fresh-repo
-          git add -A
-          git commit -m "Update extensions repo"
-          git push -f origin fresh-repo:repo
+          python -u ../main/.github/scripts/publish-repo.py "$GITHUB_SHA"

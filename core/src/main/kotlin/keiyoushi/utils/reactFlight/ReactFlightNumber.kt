@@ -30,13 +30,9 @@ object ReactFlightNumberSerializer : KSerializer<Double> {
         val raw = (decoder as JsonDecoder).decodeJsonElement().jsonPrimitive.content
         return when (raw) {
             "Infinity" -> Double.POSITIVE_INFINITY
-
             "-Infinity" -> Double.NEGATIVE_INFINITY
-
             "NaN" -> Double.NaN
-
             "-0" -> -0.0
-
             else -> raw.toDoubleOrNull()
                 ?: throw IllegalArgumentException("Failed to parse Number: $raw")
         }

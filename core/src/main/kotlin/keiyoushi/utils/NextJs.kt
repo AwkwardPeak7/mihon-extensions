@@ -1,9 +1,9 @@
 package keiyoushi.utils
 
-import eu.kanade.tachiyomi.util.asJsoup
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNames
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -65,34 +65,22 @@ private fun resolveNextJsRefs(
     resolving: Set<String> = emptySet(),
 ): JsonElement = when (element) {
     is JsonObject -> JsonObject(element.mapValues { resolveNextJsRefs(it.value, chunkCache, modelCache, resolving) })
-
     is JsonArray -> JsonArray(element.map { resolveNextJsRefs(it, chunkCache, modelCache, resolving) })
-
     is JsonPrimitive -> {
         if (element.isString && element.content.startsWith("$") && element.content.length >= 2) {
             val str = element.content
             when {
-                str == "\$undefined" -> JsonNull
-
-                // JS undefined -> null
+                str == "\$undefined" -> JsonNull // JS undefined -> null
                 // Non-finite / negative-zero -> strip '$', keep token as string for ReactFlightNumber.
                 // JSON has no Infinity/NaN, so they can't live in the JsonElement tree as numbers.
                 str == "\$Infinity" || str == "\$-Infinity" || str == "\$NaN" || str == "\$-0" ->
                     JsonPrimitive(str.substring(1))
-
-                str[1] == '$' -> JsonPrimitive(str.substring(1))
-
-                // Escaped '$' -> keep one
-                str[1] == 'D' -> JsonPrimitive(str.substring(2))
-
-                // Date -> strip '$D' for ReactFlightDate
-                str[1] == 'n' -> JsonPrimitive(str.substring(2))
-
-                // BigInt -> strip '$n' for ReactFlightBigInt
+                str[1] == '$' -> JsonPrimitive(str.substring(1)) // Escaped '$' -> keep one
+                str[1] == 'D' -> JsonPrimitive(str.substring(2)) // Date -> strip '$D' for ReactFlightDate
+                str[1] == 'n' -> JsonPrimitive(str.substring(2)) // BigInt -> strip '$n' for ReactFlightBigInt
                 str[1] == 'Q' -> resolveMapRef(str.substring(2), chunkCache, modelCache, resolving) ?: element
-
                 str[1] == 'W' -> resolveSetRef(str.substring(2), chunkCache, modelCache, resolving) ?: element
-
+                str[1] == 'L' -> resolveModelRef(str.substring(2), chunkCache, modelCache, resolving) ?: element
                 // RSC reference (`$<id>` or `$<id>:<path>`) -> resolve via chunk/model cache.
                 else -> resolveModelRef(str.substring(1), chunkCache, modelCache, resolving) ?: element
             }
@@ -145,7 +133,6 @@ private fun resolveModelRef(
 /** Indexes [value] by a single path [segment], honouring the React element tuple shape. */
 private fun walkRefSegment(value: JsonElement, segment: String): JsonElement? = when (value) {
     is JsonObject -> value[segment]
-
     is JsonArray ->
         // React element tuple ["$", type, key, props] -> map named props to their indices.
         if (value.size >= 4 && (value[0] as? JsonPrimitive)?.takeIf { it.isString }?.content == "$") {
@@ -158,7 +145,6 @@ private fun walkRefSegment(value: JsonElement, segment: String): JsonElement? = 
         } else {
             segment.toIntOrNull()?.let { value.getOrNull(it) }
         }
-
     else -> null
 }
 
@@ -260,9 +246,7 @@ private fun extractRscPayloads(
                 // e.g. emoji) occupy 4 UTF-8 bytes; we consume both surrogate chars in one step.
                 when {
                     body[pos].code < 0x80 -> bytes += 1
-
                     body[pos].code < 0x800 -> bytes += 2
-
                     Character.isHighSurrogate(body[pos]) -> {
                         bytes += 4
                         pos++ // consume the high surrogate; the loop increment handles the low
@@ -324,7 +308,6 @@ private fun parseJsonAt(body: String, start: Int): Pair<JsonElement?, Int> {
         if (inString) continue
         when (c) {
             '{', '[' -> depth++
-
             '}', ']' -> if (--depth == 0) {
                 return try {
                     Pair(jsonInstance.parseToJsonElement(body.substring(start, i)), i)
@@ -367,8 +350,16 @@ internal inline fun <reified T> inferredNextJsPredicate(): (JsonElement) -> Bool
 
     val requiredKeys = (0 until elementDescriptor.elementsCount)
         .filterNot { elementDescriptor.isElementOptional(it) || elementDescriptor.getElementDescriptor(it).isNullable }
-        .map { elementDescriptor.getElementName(it) }
-        .toSet()
+        .map { i ->
+            val primaryName = elementDescriptor.getElementName(i)
+            val annotations = elementDescriptor.getElementAnnotations(i)
+
+            val jsonNames = annotations
+                .filterIsInstance<JsonNames>()
+                .flatMap { it.names.toSet() }
+
+            (setOf(primaryName) + jsonNames)
+        }.toSet()
 
     require(requiredKeys.isNotEmpty()) {
         "Cannot infer a predicate for ${elementDescriptor.serialName}: all fields are optional or nullable. Provide an explicit predicate instead."
@@ -379,12 +370,12 @@ internal inline fun <reified T> inferredNextJsPredicate(): (JsonElement) -> Bool
             element is JsonArray &&
                 element.isNotEmpty() &&
                 element.first() is JsonObject &&
-                requiredKeys.all { it in element.first().jsonObject }
+                requiredKeys.all { it.any { it in element.first().jsonObject } }
         }
     } else {
         { element ->
             element is JsonObject &&
-                requiredKeys.all { it in element }
+                requiredKeys.all { it.any { it in element } }
         }
     }
 }
@@ -521,10 +512,12 @@ fun <T> Response.extractNextJs(
     deserializer: DeserializationStrategy<T>,
 ): T? {
     val contentType = header("Content-Type") ?: ""
-    return when {
-        "text/x-component" in contentType -> body.string().extractNextJsRsc(predicate, deserializer)
-        "text/html" in contentType -> asJsoup().extractNextJs(predicate, deserializer)
-        else -> error("Unsupported Content-Type for Next.js extraction: $contentType")
+    return use {
+        when {
+            "text/x-component" in contentType -> body.string().extractNextJsRsc(predicate, deserializer)
+            "text/html" in contentType -> asJsoup().extractNextJs(predicate, deserializer)
+            else -> error("Unsupported Content-Type for Next.js extraction: $contentType")
+        }
     }
 }
 
