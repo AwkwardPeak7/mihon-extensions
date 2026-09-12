@@ -1,0 +1,33 @@
+{
+  "name": "AwkwardPeak7's Mihon Extensions",
+  "badgeLabel": "AWP7",
+  "signingKey": "45ab79cda84203f0c2aa6bd54db46932f9d7085da9f2444dc32de58e4696655e",
+  "contact": {
+    "website": "https://github.com/AwkwardPeak7/mihon-extensions"
+  },
+  "extensionList": {
+    "extensions": [
+      {
+        "name": "MANGA Plus by SHUEISHA",
+        "packageName": "io.github.awkwardpeak.extension.all.mangaplus",
+        "resources": {
+          "apkUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/8fa35b4/tachiyomi-all.mangaplus-v1.6.20.apk",
+          "iconUrl": "https://cdn.jsdelivr.net/gh/AwkwardPeak7/mihon-extensions@main/src/all/mangaplus/res/mipmap-xhdpi/ic_launcher.png",
+          "jarUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/8fa35b4/tachiyomi-all.mangaplus-v1.6.20.jar"
+        },
+        "extensionLib": "1.6",
+        "versionCode": "106020",
+        "versionName": "1.6.20",
+        "contentWarning": "CONTENT_WARNING_SAFE",
+        "sources": [
+          {
+            "id": "1998944621602463790",
+            "name": "MANGA Plus by SHUEISHA",
+            "language": "en",
+            "homeUrl": "https://mangaplus.shueisha.co.jp"
+          }
+        ]
+      }
+    ]
+  }
+}

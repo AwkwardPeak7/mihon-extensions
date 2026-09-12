@@ -1,0 +1,12 @@
+{
+  "io.github.awkwardpeak.extension.all.mangaplus": {
+    "apk": {
+      "name": "tachiyomi-all.mangaplus-v1.6.20.apk",
+      "sha256": "77e99ffc89904e1340cf608b005c0bf6e9d4d84875cf2ea864f48c940023200e"
+    },
+    "jar": {
+      "name": "tachiyomi-all.mangaplus-v1.6.20.jar",
+      "sha256": "2ec855ae35e81ccefc4af827d8b66596c2bbb1c8e23a31547ef039eda3128fa4"
+    }
+  }
+}
