@@ -11,13 +11,13 @@
         "name": "MANGA Plus by SHUEISHA",
         "packageName": "io.github.awkwardpeak.extension.all.mangaplus",
         "resources": {
-          "apkUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/8fa35b4/tachiyomi-all.mangaplus-v1.6.20.apk",
+          "apkUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/0997cac/tachiyomi-all.mangaplus-v1.6.21.apk",
           "iconUrl": "https://cdn.jsdelivr.net/gh/AwkwardPeak7/mihon-extensions@main/src/all/mangaplus/res/mipmap-xhdpi/ic_launcher.png",
-          "jarUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/8fa35b4/tachiyomi-all.mangaplus-v1.6.20.jar"
+          "jarUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/0997cac/tachiyomi-all.mangaplus-v1.6.21.jar"
         },
         "extensionLib": "1.6",
-        "versionCode": "106020",
-        "versionName": "1.6.20",
+        "versionCode": "106021",
+        "versionName": "1.6.21",
         "contentWarning": "CONTENT_WARNING_SAFE",
         "sources": [
           {
