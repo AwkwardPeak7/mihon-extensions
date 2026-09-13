@@ -32,13 +32,13 @@
         "name": "INKR (APP)",
         "packageName": "io.github.awkwardpeak.extension.en.inkr",
         "resources": {
-          "apkUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/6111ada/tachiyomi-en.inkr-v1.6.2.apk",
+          "apkUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/cab9781/tachiyomi-en.inkr-v1.6.3.apk",
           "iconUrl": "https://cdn.jsdelivr.net/gh/AwkwardPeak7/mihon-extensions@repo/icons/src/en/inkr/res/mipmap-xhdpi/ic_launcher.png",
-          "jarUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/6111ada/tachiyomi-en.inkr-v1.6.2.jar"
+          "jarUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/cab9781/tachiyomi-en.inkr-v1.6.3.jar"
         },
         "extensionLib": "1.6",
-        "versionCode": "106002",
-        "versionName": "1.6.2",
+        "versionCode": "106003",
+        "versionName": "1.6.3",
         "contentWarning": "CONTENT_WARNING_NSFW",
         "sources": [
           {

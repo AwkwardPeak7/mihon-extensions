@@ -11,12 +11,12 @@
   },
   "io.github.awkwardpeak.extension.en.inkr": {
     "apk": {
-      "name": "tachiyomi-en.inkr-v1.6.2.apk",
-      "sha256": "8cb30103471562650b52cc72b7e9f09386cca5dd80625c488e61d5ee93e6b094"
+      "name": "tachiyomi-en.inkr-v1.6.3.apk",
+      "sha256": "c101e1b0f7c223e0d4f9fe9d82c141e299fbddcaf7aae62d7dbfab374417e9fb"
     },
     "jar": {
-      "name": "tachiyomi-en.inkr-v1.6.2.jar",
-      "sha256": "38fdec9a7b347dcc5d7b805e69e60644eaca9e99b110922b46e7cc5172167f3f"
+      "name": "tachiyomi-en.inkr-v1.6.3.jar",
+      "sha256": "d294d58dd7382a21a639ecc7fe66b4a63a90068f2d1e4920d70040b9623af1c3"
     }
   }
 }
