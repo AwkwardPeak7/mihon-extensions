@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  repository_dispatch:
+    types:
+      - trigger-build
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and Publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: AwkwardPeak7/mihon-extensions-source
+          ref: main
+          token: ${{ secrets.SOURCE_TOKEN }}
+          path: source
+
+      - name: Set up Java
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          java-version: 17
+          distribution: temurin
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+
+      - name: Prepare signing key
+        run: |
+          echo ${{ secrets.KEYSTORE }} | base64 -d > source/signingkey.jks
+
+      - name: Build extensions
+        env:
+          ALIAS: ${{ secrets.ALIAS }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          MANGAPLUS_SALT: ${{ secrets.MANGAPLUS_SALT }}
+        run: |
+          cd source
+          ./gradlew assembleRelease
+
+      - name: Clean up CI files
+        run: rm source/signingkey.jks
+
+      - name: Collect build artifacts
+        run: |
+          mkdir -p ~/apk-artifacts
+          cd source
+          find . -path '*/build/keiyoushi-source-info.json' | while read -r info; do
+            builddir=$(dirname "$info")
+            dest=~/apk-artifacts/$(echo "$builddir" | tr '/' '_')
+            mkdir -p "$dest"
+            cp "$info" "$dest/"
+            cp -r "$builddir/outputs" "$dest/"
+          done
+
+      - name: Checkout repo branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: repo
+          path: repo
+
+      - name: Publish and deploy repo
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_DIR: ../source
+        run: |
+          cd repo
+          pip install protobuf
+          python -u ../repo/.github/scripts/publish-repo.py "${{ github.event.client_payload.sha || github.sha }}"
