@@ -75,8 +75,9 @@ jobs:
       - name: Publish and deploy repo
         env:
           GH_TOKEN: ${{ github.token }}
-          SOURCE_DIR: ../source
+          SOURCE_DIR: ../source`n          PYTHONDONTWRITEBYTECODE: 1
         run: |
           cd repo
           pip install protobuf
           python -u ../repo/.github/scripts/publish-repo.py "${{ github.event.client_payload.sha || github.sha }}"
+
