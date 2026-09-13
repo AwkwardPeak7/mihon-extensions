@@ -8,37 +8,37 @@
   "extensionList": {
     "extensions": [
       {
-        "name": "MANGA Plus by SHUEISHA",
+        "name": "MANGA Plus (APP)",
         "packageName": "io.github.awkwardpeak.extension.all.mangaplus",
         "resources": {
-          "apkUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/f59ae51/tachiyomi-all.mangaplus-v1.6.23.apk",
+          "apkUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/6111ada/tachiyomi-all.mangaplus-v1.6.24.apk",
           "iconUrl": "https://cdn.jsdelivr.net/gh/AwkwardPeak7/mihon-extensions@repo/icons/src/en/mangaplus/res/mipmap-xhdpi/ic_launcher.png",
-          "jarUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/f59ae51/tachiyomi-all.mangaplus-v1.6.23.jar"
+          "jarUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/6111ada/tachiyomi-all.mangaplus-v1.6.24.jar"
         },
         "extensionLib": "1.6",
-        "versionCode": "106023",
-        "versionName": "1.6.23",
+        "versionCode": "106024",
+        "versionName": "1.6.24",
         "contentWarning": "CONTENT_WARNING_SAFE",
         "sources": [
           {
             "id": "1998944621602463790",
-            "name": "MANGA Plus by SHUEISHA",
+            "name": "MANGA Plus",
             "language": "en",
             "homeUrl": "https://mangaplus.shueisha.co.jp"
           }
         ]
       },
       {
-        "name": "INKR",
+        "name": "INKR (APP)",
         "packageName": "io.github.awkwardpeak.extension.en.inkr",
         "resources": {
-          "apkUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/f59ae51/tachiyomi-en.inkr-v1.6.1.apk",
+          "apkUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/6111ada/tachiyomi-en.inkr-v1.6.2.apk",
           "iconUrl": "https://cdn.jsdelivr.net/gh/AwkwardPeak7/mihon-extensions@repo/icons/src/en/inkr/res/mipmap-xhdpi/ic_launcher.png",
-          "jarUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/f59ae51/tachiyomi-en.inkr-v1.6.1.jar"
+          "jarUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/6111ada/tachiyomi-en.inkr-v1.6.2.jar"
         },
         "extensionLib": "1.6",
-        "versionCode": "106001",
-        "versionName": "1.6.1",
+        "versionCode": "106002",
+        "versionName": "1.6.2",
         "contentWarning": "CONTENT_WARNING_NSFW",
         "sources": [
           {

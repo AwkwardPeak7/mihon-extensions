@@ -1,22 +1,22 @@
 {
   "io.github.awkwardpeak.extension.all.mangaplus": {
     "apk": {
-      "name": "tachiyomi-all.mangaplus-v1.6.23.apk",
-      "sha256": "9b0d5c30f004a6caeffe80d2eece112e6eee7edf4c9daae3d0a935858ec55dfe"
+      "name": "tachiyomi-all.mangaplus-v1.6.24.apk",
+      "sha256": "9e0704f519a8801419f9b96b32e83879e67ace96d0e5cacbaf7711a01d6a9646"
     },
     "jar": {
-      "name": "tachiyomi-all.mangaplus-v1.6.23.jar",
-      "sha256": "a7ff676b1f832338d5aac83e6abfe061a617146a90b3ddf54682516e65b775a2"
+      "name": "tachiyomi-all.mangaplus-v1.6.24.jar",
+      "sha256": "2e1f74187bd66db60fc3e4f71726b57346ed2cab27e7a98c13a63ab5cdec3dc3"
     }
   },
   "io.github.awkwardpeak.extension.en.inkr": {
     "apk": {
-      "name": "tachiyomi-en.inkr-v1.6.1.apk",
-      "sha256": "c09140dfb7deb669c9d67e5fe33bc89cf84ca03a409c57542e4801fb9407a38e"
+      "name": "tachiyomi-en.inkr-v1.6.2.apk",
+      "sha256": "8cb30103471562650b52cc72b7e9f09386cca5dd80625c488e61d5ee93e6b094"
     },
     "jar": {
-      "name": "tachiyomi-en.inkr-v1.6.1.jar",
-      "sha256": "b85b571e34b9f18e93fa3edfb2d9609d1c4f01b5e131f0f2465e402fc82c517d"
+      "name": "tachiyomi-en.inkr-v1.6.2.jar",
+      "sha256": "38fdec9a7b347dcc5d7b805e69e60644eaca9e99b110922b46e7cc5172167f3f"
     }
   }
 }
