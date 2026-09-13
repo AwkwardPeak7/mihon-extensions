@@ -11,13 +11,13 @@
         "name": "MANGA Plus by SHUEISHA",
         "packageName": "io.github.awkwardpeak.extension.all.mangaplus",
         "resources": {
-          "apkUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/a1438bd/tachiyomi-all.mangaplus-v1.6.22.apk",
-          "iconUrl": "https://cdn.jsdelivr.net/gh/AwkwardPeak7/mihon-extensions@repo/icons/src/all/mangaplus/res/mipmap-xhdpi/ic_launcher.png",
-          "jarUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/7fbf05e/tachiyomi-all.mangaplus-v1.6.22.jar"
+          "apkUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/f59ae51/tachiyomi-all.mangaplus-v1.6.23.apk",
+          "iconUrl": "https://cdn.jsdelivr.net/gh/AwkwardPeak7/mihon-extensions@repo/icons/src/en/mangaplus/res/mipmap-xhdpi/ic_launcher.png",
+          "jarUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/f59ae51/tachiyomi-all.mangaplus-v1.6.23.jar"
         },
         "extensionLib": "1.6",
-        "versionCode": "106022",
-        "versionName": "1.6.22",
+        "versionCode": "106023",
+        "versionName": "1.6.23",
         "contentWarning": "CONTENT_WARNING_SAFE",
         "sources": [
           {
@@ -25,6 +25,27 @@
             "name": "MANGA Plus by SHUEISHA",
             "language": "en",
             "homeUrl": "https://mangaplus.shueisha.co.jp"
+          }
+        ]
+      },
+      {
+        "name": "INKR",
+        "packageName": "io.github.awkwardpeak.extension.en.inkr",
+        "resources": {
+          "apkUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/f59ae51/tachiyomi-en.inkr-v1.6.1.apk",
+          "iconUrl": "https://cdn.jsdelivr.net/gh/AwkwardPeak7/mihon-extensions@repo/icons/src/en/inkr/res/mipmap-xhdpi/ic_launcher.png",
+          "jarUrl": "https://github.com/AwkwardPeak7/mihon-extensions/releases/download/f59ae51/tachiyomi-en.inkr-v1.6.1.jar"
+        },
+        "extensionLib": "1.6",
+        "versionCode": "106001",
+        "versionName": "1.6.1",
+        "contentWarning": "CONTENT_WARNING_NSFW",
+        "sources": [
+          {
+            "id": "6949560025265725268",
+            "name": "INKR",
+            "language": "en",
+            "homeUrl": "https://comics.inkr.com"
           }
         ]
       }
