@@ -198,7 +198,7 @@ release_count = (
     else 0
 )
 ext_per_release = (
-    math.ceil(total_changed_extensions / release_count) if release_count else 0
+    math.ceil(total_changed_extensions / release_count) if release_count else 1
 )
 
 
